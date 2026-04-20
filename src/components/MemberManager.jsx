@@ -40,7 +40,7 @@ export default function MemberManager() {
       </h3>
 
       <ul className="space-y-2">
-        {plan?.participants?.map(uid => {
+        {Array.isArray(plan?.participants) && plan.participants.map(uid => {
           const info = participantsInfo[uid];
           const email = info?.displayName || info?.email || uid;
           const roleString = plan.roles?.[uid] || 'viewer';

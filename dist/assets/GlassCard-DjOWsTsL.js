@@ -1,1 +1,0 @@
-import{n as e,x as t}from"./index-CK4dhKpT.js";t();var n=e();function r({children:e,className:t=``,...r}){return(0,n.jsx)(`div`,{className:`bg-white/40 dark:bg-black/20 backdrop-blur-lg border border-white/20 dark:border-white/10 rounded-2xl shadow-xl transition-all duration-300 ${t}`,...r,children:e})}export{r as t};

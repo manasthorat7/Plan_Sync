@@ -83,7 +83,12 @@ export default function usePlan(planId, currentUserUid) {
     if (!planId) return;
     const planRef = doc(db, 'plans', planId);
     await updateDoc(planRef, updates);
-    setPlan(prev => ({ ...prev, ...updates }));
+    // Re-fetch the document to get actual values instead of merging
+    // FieldValue sentinels (arrayUnion/arrayRemove) into local state
+    const freshSnap = await getDoc(planRef);
+    if (freshSnap.exists()) {
+      setPlan({ id: freshSnap.id, ...freshSnap.data() });
+    }
   };
 
   const deletePlanDb = async () => {
