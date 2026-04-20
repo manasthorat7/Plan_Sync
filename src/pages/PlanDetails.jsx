@@ -154,6 +154,7 @@ export default function PlanDetails() {
   }
 
   const isOwner = plan?.roles?.[currentUser.uid] === 'owner' || false;
+  const isFinalized = plan?.status === 'finalized';
 
   return (
     <div className="max-w-5xl mx-auto p-6 mt-4">
@@ -173,12 +174,16 @@ export default function PlanDetails() {
              <div className="flex items-center gap-3 mb-2">
                  <h2 className="text-4xl font-extrabold text-slate-800">{plan.title}</h2>
                  <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider whitespace-nowrap mt-1 ${
-                    plan.status === 'upcoming' ? 'bg-amber-100 text-amber-800' :
-                    plan.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
-                    'bg-slate-100 text-slate-800'
+                    plan.status === 'finalized' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                    'bg-amber-100 text-amber-800'
                  }`}>
-                    {plan.status || 'Draft'}
+                    {plan.status === 'finalized' ? 'Locked' : 'Draft'}
                  </span>
+                 {plan.status === 'finalized' && plan.finalSlot && (
+                    <span className="text-sm bg-primary text-white font-semibold px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-sm border border-indigo-500 ml-2">
+                       🎯 {plan.finalSlot}
+                    </span>
+                 )}
              </div>
              {plan.description && <p className="text-slate-600 mt-2 text-lg">{plan.description}</p>}
            </div>
@@ -194,6 +199,7 @@ export default function PlanDetails() {
                   setPlan={setPlan} 
                   isOwner={isOwner} 
                   participantsInfo={participantsInfo} 
+                  isFinalized={isFinalized}
               />
            </div>
            
@@ -202,6 +208,7 @@ export default function PlanDetails() {
               planId={plan.id}
               currentUser={currentUser}
               participantsInfo={participantsInfo}
+              isFinalized={isFinalized}
            />
         </div>
 
@@ -238,7 +245,7 @@ export default function PlanDetails() {
               </ul>
               
               {/* Conditional Inviting Tool restricted exclusively to owners */}
-              {isOwner && (
+              {isOwner && !isFinalized && (
                  <div className="mt-6 pt-5 border-t border-slate-100">
                     <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
                     
