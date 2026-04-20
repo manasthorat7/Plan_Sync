@@ -2,32 +2,57 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export default function PlanDetails() {
   const { id } = useParams();
   const [plan, setPlan] = useState(null);
+  const [participantsInfo, setParticipantsInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Invitation State
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('editor');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState('');
+
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchPlan() {
+    async function fetchPlanAndUsers() {
       try {
         const docRef = doc(db, 'plans', id);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const planData = docSnap.data();
-          // Security check constraint: Protect document against unauthorized direct UUID links
+          // Security verify
           if (!planData.participants?.includes(currentUser.uid)) {
              setError("You do not have permission to view this plan.");
              setPlan(null);
-          } else {
-             setPlan({ id: docSnap.id, ...planData });
-             setError('');
-          }
+             setLoading(false);
+             return;
+          } 
+          
+          setPlan({ id: docSnap.id, ...planData });
+          setError('');
+
+          // Fetch explicit participant emails across the mapped UIDs dynamically
+          const infoMap = {};
+          await Promise.all((planData.participants || []).map(async (uid) => {
+             const userSnap = await getDoc(doc(db, 'users', uid));
+             if (userSnap.exists()) {
+                infoMap[uid] = userSnap.data();
+             } else {
+                infoMap[uid] = { email: "Unknown User", uid };
+             }
+          }));
+
+          setParticipantsInfo(infoMap);
+
         } else {
           setError("Plan not found. It may have been deleted.");
         }
@@ -40,9 +65,69 @@ export default function PlanDetails() {
     }
 
     if (id && currentUser) {
-      fetchPlan();
+      fetchPlanAndUsers();
     }
   }, [id, currentUser]);
+
+  async function handleInvite(e) {
+    e.preventDefault();
+    setInviteError('');
+    setInviteSuccess('');
+    if (!inviteEmail.trim()) return;
+
+    setInviteLoading(true);
+    try {
+      // 1. Traverse normalized users directory locating the mapping
+      const q = query(collection(db, 'users'), where('email', '==', inviteEmail.trim()));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        setInviteError("User not found across registered accounts.");
+        setInviteLoading(false);
+        return;
+      }
+
+      // Secure specific match
+      let newUserId = null;
+      let newUserEmail = null;
+      querySnapshot.forEach((doc) => {
+        newUserId = doc.data().uid;
+        newUserEmail = doc.data().email;
+      });
+
+      // 2. Trap duplication
+      if (plan.participants.includes(newUserId)) {
+         setInviteError("User lies inside active participant array already.");
+         setInviteLoading(false);
+         return;
+      }
+
+      // 3. Sync changes backwards into global scope securely
+      const planRef = doc(db, 'plans', id);
+      await updateDoc(planRef, {
+        participants: arrayUnion(newUserId),
+        [`roles.${newUserId}`]: inviteRole
+      });
+
+      // 4. Clean frontend local mirroring perfectly smoothly
+      setParticipantsInfo(prev => ({ ...prev, [newUserId]: { uid: newUserId, email: newUserEmail } }));
+      
+      const newPlanState = { ...plan };
+      newPlanState.participants.push(newUserId);
+      if (!newPlanState.roles) newPlanState.roles = {};
+      newPlanState.roles[newUserId] = inviteRole;
+      setPlan(newPlanState);
+
+      setInviteSuccess(`${inviteEmail} added successfully!`);
+      setInviteEmail('');  // Purge text
+      
+    } catch (err) {
+       console.error("Encountered inviting exception:", err);
+       setInviteError("Error transmitting invitation parameters to Firebase.");
+    } finally {
+       setInviteLoading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -65,6 +150,8 @@ export default function PlanDetails() {
       </div>
     );
   }
+
+  const isOwner = plan?.roles?.[currentUser.uid] === 'owner' || false;
 
   return (
     <div className="max-w-5xl mx-auto p-6 mt-4">
@@ -96,10 +183,8 @@ export default function PlanDetails() {
         </div>
       </div>
 
-      {/* Grid Architecture Implementation */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
         
-        {/* Main Interface Window */}
         <div className="lg:col-span-2 space-y-6">
            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px]">
               <h3 className="text-xl font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3">Itinerary Overview</h3>
@@ -112,32 +197,77 @@ export default function PlanDetails() {
            </div>
         </div>
 
-        {/* Sidebar Attributes Layer */}
         <div className="space-y-6">
            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
               <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
                 Participants
-                <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{plan.participants.length}</span>
+                <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{plan.participants?.length || 0}</span>
               </h3>
+              
               <ul className="space-y-3">
-                 {plan.participants.map(uid => (
-                    <li key={uid} className="flex items-center gap-3">
-                       <div className="h-8 w-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-                          {uid.substring(0, 2).toUpperCase()}
-                       </div>
-                       <div className="text-sm font-medium text-slate-700 truncate">
-                          {uid === currentUser.uid ? 'You (Creator)' : uid}
-                       </div>
-                    </li>
-                 ))}
+                 {plan.participants?.map(uid => {
+                    const info = participantsInfo[uid];
+                    const email = info?.email || uid;
+                    const role = plan.roles?.[uid] || 'participant';
+
+                    return (
+                        <li key={uid} className="flex items-center justify-between gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors">
+                           <div className="flex items-center gap-3 overflow-hidden">
+                             <div className="h-8 w-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-indigo-200">
+                                {email.substring(0, 2)}
+                             </div>
+                             <div className="text-sm font-medium text-slate-700 truncate min-w-0">
+                                {email}
+                                {uid === currentUser.uid && <span className="text-xs text-slate-400 font-normal ml-1">(You)</span>}
+                             </div>
+                           </div>
+                           <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-md uppercase font-semibold tracking-wider shrink-0">
+                             {role}
+                           </span>
+                        </li>
+                    )
+                 })}
               </ul>
               
-              <button className="mt-5 w-full flex justify-center items-center gap-2 py-2 border border-dashed border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:text-primary hover:border-primary hover:bg-indigo-50 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
-                  </svg>
-                  Invite Members
-              </button>
+              {/* Conditional Inviting Tool restricted exclusively to owners */}
+              {isOwner && (
+                 <div className="mt-6 pt-5 border-t border-slate-100">
+                    <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
+                    
+                    {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
+                    {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
+                    
+                    <form onSubmit={handleInvite} className="flex flex-col gap-2.5 relative">
+                       <input 
+                         type="email" 
+                         required
+                         placeholder="user@example.com" 
+                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
+                         value={inviteEmail}
+                         onChange={(e) => setInviteEmail(e.target.value)}
+                         disabled={inviteLoading}
+                       />
+                       <div className="flex gap-2">
+                         <select 
+                           className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
+                           value={inviteRole}
+                           onChange={(e) => setInviteRole(e.target.value)}
+                           disabled={inviteLoading}
+                         >
+                           <option value="editor">Editor</option>
+                           <option value="owner">Owner</option>
+                         </select>
+                         <button 
+                           type="submit" 
+                           disabled={inviteLoading}
+                           className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+                         >
+                           {inviteLoading ? 'Wait...' : 'Invite'}
+                         </button>
+                       </div>
+                    </form>
+                 </div>
+              )}
            </div>
         </div>
       </div>

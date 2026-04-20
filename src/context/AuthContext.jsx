@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
+import { auth, db } from '../services/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -30,7 +31,18 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, user => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Sync user payload natively to the normalize 'users' collection framework
+        try {
+          await setDoc(doc(db, 'users', user.uid), {
+            uid: user.uid,
+            email: user.email
+          }, { merge: true });
+        } catch (e) {
+          console.error("Failed to sync normalized user record: ", e);
+        }
+      }
       setCurrentUser(user);
       setLoading(false);
     });

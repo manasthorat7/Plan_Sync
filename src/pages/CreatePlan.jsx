@@ -27,6 +27,9 @@ export default function CreatePlan() {
         title: title.trim(),
         description: description.trim(),
         participants: [currentUser.uid], // Include creator exclusively at init
+        roles: {
+          [currentUser.uid]: 'owner' // Assign the constructing user explicit ownership map mapping
+        },
         status: 'draft',
         createdAt: serverTimestamp(), // Dynamically register server-side instantiation
       };
