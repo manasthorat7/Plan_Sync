@@ -196,7 +196,7 @@ It ensures:
 
 ## 🌐 Live Deployment
 
-*(Add your Vercel/Netlify link here)*
+*(https://plan-sync-by-manas.netlify.app/)*
 
 ---
 
