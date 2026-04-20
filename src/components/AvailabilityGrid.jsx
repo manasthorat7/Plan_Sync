@@ -1,0 +1,214 @@
+import React, { useState } from 'react';
+import { db } from '../services/firebase';
+import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { useAuth } from '../context/AuthContext';
+
+export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsInfo }) {
+  const { currentUser } = useAuth();
+  
+  // Controlled state mapping evaluating current user's availability selections dynamically
+  const [userSelections, setUserSelections] = useState(
+    plan.availabilities?.[currentUser.uid] || {}
+  );
+  
+  const [newSlotLabel, setNewSlotLabel] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddingSlot, setIsAddingSlot] = useState(false);
+  const [error, setError] = useState("");
+
+  const timeSlots = plan.timeSlots || [];
+  const availabilities = plan.availabilities || {};
+
+  // Logic processing evaluating exact participant voting arrays locally
+  function calculateSlotStats(slotName) {
+    let available = 0;
+    let maybe = 0;
+    let unavailable = 0;
+    
+    Object.values(availabilities).forEach(userVotes => {
+      if (userVotes[slotName] === 'available') available++;
+      if (userVotes[slotName] === 'maybe') maybe++;
+      if (userVotes[slotName] === 'unavailable') unavailable++;
+    });
+
+    return { available, maybe, unavailable };
+  }
+
+  async function handleAddSlot(e) {
+    e.preventDefault();
+    if (!newSlotLabel.trim()) return;
+    
+    const slot = newSlotLabel.trim();
+    if (timeSlots.includes(slot)) {
+      setError("This exact time slot has already been generated!");
+      return;
+    }
+
+    setIsAddingSlot(true);
+    setError("");
+
+    try {
+      const planRef = doc(db, 'plans', plan.id);
+      await updateDoc(planRef, {
+        timeSlots: arrayUnion(slot)
+      });
+      
+      // Mirror frontend state updates immediately guaranteeing zero layout popping
+      setPlan(prev => ({
+        ...prev,
+        timeSlots: [...(prev.timeSlots || []), slot]
+      }));
+      setNewSlotLabel("");
+    } catch (err) {
+      console.error(err);
+      setError("Failed to push time slot onto server infrastructure.");
+    } finally {
+      setIsAddingSlot(false);
+    }
+  }
+
+  async function saveAvailabilities() {
+    setIsSaving(true);
+    setError("");
+    
+    try {
+      const planRef = doc(db, 'plans', plan.id);
+      await updateDoc(planRef, {
+        // Native deeply nested Firestore map update query format
+        [`availabilities.${currentUser.uid}`]: userSelections
+      });
+
+      // Synchronize overall state
+      setPlan(prev => ({
+        ...prev,
+        availabilities: {
+          ...(prev.availabilities || {}),
+          [currentUser.uid]: userSelections
+        }
+      }));
+    } catch(err) {
+       console.error(err);
+       setError("System malfunction locking in availability choice strings.");
+    } finally {
+       setIsSaving(false);
+    }
+  }
+
+  function toggleStatus(slotName, status) {
+     setUserSelections(prev => ({
+        ...prev,
+        [slotName]: prev[slotName] === status ? null : status // Automatically toggle off identical string matches
+     }));
+  }
+
+  return (
+    <div className="flex flex-col h-full w-full">
+      {/* Dynamic Header Architecture Layer */}
+      <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+         <h3 className="text-xl font-bold text-slate-800">Time Slot Availability</h3>
+         <button 
+            onClick={saveAvailabilities}
+            disabled={isSaving || timeSlots.length === 0}
+            className="text-sm bg-primary hover:bg-indigo-600 text-white font-medium px-4 py-2 rounded transition-colors shadow-sm disabled:opacity-50"
+         >
+            {isSaving ? "Syncing..." : "Save My Votes"}
+         </button>
+      </div>
+
+      {error && <div className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm mb-4 font-semibold">{error}</div>}
+
+      {/* Primary Grid Iteration Map layout rendering cleanly if populated or flagging visually empty conditions */}
+      {timeSlots.length === 0 ? (
+         <div className="bg-slate-50 border border-slate-200 rounded-lg p-8 text-center text-slate-500 mb-6">
+            <svg className="w-10 h-10 mx-auto mb-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            <p className="font-medium text-slate-600">No collaborative time slots have been proposed yet.</p>
+         </div>
+      ) : (
+         <div className="overflow-x-auto mb-6">
+           <table className="w-full text-left border-collapse min-w-[500px]">
+             <thead>
+               <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-y border-slate-200">
+                 <th className="py-3 px-4 w-1/3">Proposed Slot</th>
+                 <th className="py-3 px-4 w-1/3">Your Availability</th>
+                 <th className="py-3 px-4 text-center w-1/3">Group Trend Status</th>
+               </tr>
+             </thead>
+             <tbody>
+               {timeSlots.map(slot => {
+                 const stats = calculateSlotStats(slot);
+                 const sum = stats.available + stats.maybe + stats.unavailable;
+                 const myVote = userSelections[slot];
+
+                 return (
+                   <tr key={slot} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                     <td className="py-4 px-4 font-semibold text-slate-800">{slot}</td>
+                     <td className="py-4 px-4">
+                       <div className="flex gap-2 text-xs font-semibold">
+                         <button 
+                           onClick={() => toggleStatus(slot, 'available')}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'available' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'}`}
+                         >
+                           Available
+                         </button>
+                         <button 
+                           onClick={() => toggleStatus(slot, 'maybe')}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'maybe' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200 hover:text-amber-600'}`}
+                         >
+                           Maybe
+                         </button>
+                         <button 
+                           onClick={() => toggleStatus(slot, 'unavailable')}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'unavailable' ? 'bg-red-100 border-red-200 text-red-800' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600'}`}
+                         >
+                           No
+                         </button>
+                       </div>
+                     </td>
+                     <td className="py-4 px-4 text-center">
+                        {sum === 0 ? (
+                            <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-wider">Awaiting Votes</span>
+                        ) : (
+                            <div className="flex items-center justify-center gap-2 text-sm font-bold bg-slate-50 py-1.5 rounded-lg border border-slate-100">
+                               <span className="text-emerald-600" title={`${stats.available} Available`}>{stats.available} Yay</span> <span className="text-slate-300">|</span>
+                               <span className="text-amber-500" title={`${stats.maybe} Maybe`}>{stats.maybe} TBD</span> <span className="text-slate-300">|</span>
+                               <span className="text-red-500" title={`${stats.unavailable} Unavailable`}>{stats.unavailable} Nay</span>
+                            </div>
+                        )}
+                     </td>
+                   </tr>
+                 )
+               })}
+             </tbody>
+           </table>
+         </div>
+      )}
+
+      {/* Owner Dynamic Control Parameter Generation Layer */}
+      {isOwner && (
+         <div className="mt-auto pt-4 border-t border-slate-100">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Owner Controls — Generate Grid Nodes</h4>
+            <form onSubmit={handleAddSlot} className="flex gap-2 items-center">
+               <input 
+                 type="text" 
+                 placeholder="E.g. July 12th @ 5 PM" 
+                 required
+                 value={newSlotLabel}
+                 onChange={e => setNewSlotLabel(e.target.value)}
+                 className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-medium text-slate-800 bg-slate-50 focus:bg-white transition-colors"
+                 disabled={isAddingSlot}
+               />
+               <button 
+                 type="submit" 
+                 disabled={isAddingSlot}
+                 className="bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
+               >
+                 {isAddingSlot ? 'Processing...' : 'Add Time Slot'}
+               </button>
+            </form>
+         </div>
+      )}
+    </div>
+  );
+}
