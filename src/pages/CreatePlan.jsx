@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db, auth } from '../services/firebase';
+import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import AIHelperModal from '../components/AIHelperModal';
 
 export default function CreatePlan() {
   const [title, setTitle] = useState('');
@@ -12,32 +11,6 @@ export default function CreatePlan() {
   const [loading, setLoading] = useState(false);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-
-  const handleAIApply = useCallback(({ title: aiTitle, description: aiDesc }) => {
-    setTitle(aiTitle);
-    setDescription(aiDesc);
-  }, []);
-
-  // Debug function — test raw Firestore connectivity
-  async function testFirestore() {
-    console.log("🧪 Testing Firestore connection...");
-    console.log("🧪 db object:", db);
-    console.log("🧪 auth.currentUser:", auth.currentUser);
-    try {
-      const ref = await addDoc(collection(db, "test"), {
-        message: "Firestore connectivity test",
-        time: new Date(),
-        uid: auth.currentUser?.uid || "no-user",
-      });
-      console.log("✅ Test write SUCCESS — doc ID:", ref.id);
-      alert("✅ Firestore works! Doc ID: " + ref.id);
-    } catch (e) {
-      console.error("❌ Test write FAILED:", e);
-      console.error("❌ Error code:", e.code);
-      console.error("❌ Error message:", e.message);
-      alert("❌ Firestore test failed: " + e.code + " — " + e.message);
-    }
-  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -48,10 +21,6 @@ export default function CreatePlan() {
     if (!currentUser) {
       return setError('You must be logged in to create a plan.');
     }
-
-    console.log("📝 Starting plan creation...");
-    console.log("📝 currentUser.uid:", currentUser.uid);
-    console.log("📝 db instance:", db);
 
     try {
       setError('');
@@ -69,18 +38,11 @@ export default function CreatePlan() {
         createdAt: serverTimestamp(),
       };
 
-      console.log("📝 Plan payload:", JSON.stringify(planData, null, 2));
-      console.log("📝 Calling addDoc now...");
-
       const docRef = await addDoc(collection(db, 'plans'), planData);
-
-      console.log("✅ Plan created successfully! ID:", docRef.id);
+      console.log("Plan created with ID:", docRef.id);
       navigate('/');
     } catch (err) {
-      console.error("🔥 FIRESTORE WRITE ERROR:", err);
-      console.error("🔥 Error code:", err.code);
-      console.error("🔥 Error message:", err.message);
-      console.error("🔥 Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      console.error("Firestore write error:", err);
       setError('Failed to create plan: ' + (err.code ? `[${err.code}] ` : '') + err.message);
     } finally {
       setLoading(false);
@@ -104,27 +66,11 @@ export default function CreatePlan() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-
-        {/* Generative Intelligence UI Drop Block */}
-        <AIHelperModal onApply={handleAIApply} />
-
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-md text-sm mb-6 border border-red-100">
             {error}
           </div>
         )}
-
-        {/* Debug button — remove after confirming Firestore works */}
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-xs text-amber-700 font-medium mb-2">🛠️ Debug: Test if Firestore can accept writes</p>
-          <button
-            type="button"
-            onClick={testFirestore}
-            className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            Test Firestore Write
-          </button>
-        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
