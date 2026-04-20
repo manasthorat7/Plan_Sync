@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import PrivateRoute from './components/PrivateRoute'
+import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
@@ -38,15 +39,7 @@ export default function App() {
           path="/" 
           element={
             <PrivateRoute>
-              <div className="max-w-5xl mx-auto p-6 mt-8">
-                <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-                  <h2 className="text-2xl font-semibold mb-4 text-slate-800">
-                    Welcome to PlanSync Dashboard
-                  </h2>
-                  <p className="text-slate-600 mb-4">You are securely logged in as <span className="font-semibold text-slate-800">{currentUser?.email}</span>.</p>
-                  <p className="text-slate-600">This is the securely restricted area. Start building your group planning tools here!</p>
-                </div>
-              </div>
+              <Dashboard />
             </PrivateRoute>
           } 
         />
