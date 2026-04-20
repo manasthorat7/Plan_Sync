@@ -1,5 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import PrivateRoute from './components/PrivateRoute'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
@@ -19,7 +20,7 @@ function Layout({ children }) {
           </button>
         )}
       </header>
-      <main className="flex-1 w-full">
+      <main className="flex-1 w-full relative">
         {children}
       </main>
     </div>
@@ -32,27 +33,27 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={
-          <div className="max-w-5xl mx-auto p-6 mt-8">
-            <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-              <h2 className="text-2xl font-semibold mb-4 text-slate-800">
-                Welcome to PlanSync
-              </h2>
-              {currentUser ? (
-                <>
-                  <p className="text-slate-600 mb-4">You are securely logged in as <span className="font-heading text-slate-800 font-semibold">{currentUser.email}</span>.</p>
-                  <p className="text-slate-600">This is a clean, minimal UI setup. Ready to start building the group planning app!</p>
-                </>
-              ) : (
-                <p className="text-slate-600">
-                  Please <a href="/login" className="text-primary hover:underline">log in</a> or <a href="/signup" className="text-primary hover:underline">sign up</a> to start planning with your group!
-                </p>
-              )}
-            </div>
-          </div>
-        } />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        {/* Secure Application Area (Dashboard) */}
+        <Route 
+          path="/" 
+          element={
+            <PrivateRoute>
+              <div className="max-w-5xl mx-auto p-6 mt-8">
+                <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+                  <h2 className="text-2xl font-semibold mb-4 text-slate-800">
+                    Welcome to PlanSync Dashboard
+                  </h2>
+                  <p className="text-slate-600 mb-4">You are securely logged in as <span className="font-semibold text-slate-800">{currentUser?.email}</span>.</p>
+                  <p className="text-slate-600">This is the securely restricted area. Start building your group planning tools here!</p>
+                </div>
+              </div>
+            </PrivateRoute>
+          } 
+        />
+
+        {/* Public Authentication Pages (If already logged in, they shouldn't realistically stay here. You can add public redirects manually later if desired.) */}
+        <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/signup" element={currentUser ? <Navigate to="/" replace /> : <Signup />} />
       </Routes>
     </Layout>
   )
