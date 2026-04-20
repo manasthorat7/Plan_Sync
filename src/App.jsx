@@ -1,11 +1,16 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from './context/AuthContext'
+import React, { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import GlobalLoader from './components/GlobalLoader';
+
 import PrivateRoute from './components/PrivateRoute'
-import Dashboard from './pages/Dashboard'
-import CreatePlan from './pages/CreatePlan'
-import PlanDetails from './pages/PlanDetails'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
+
+// Code Splitting specifically isolating javascript bundles seamlessly decoupling upfront loading sequences 
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CreatePlan = lazy(() => import('./pages/CreatePlan'));
+const PlanDetails = lazy(() => import('./pages/PlanDetails'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
 
 function Layout({ children }) {
   const { currentUser, logout } = useAuth();
@@ -35,37 +40,39 @@ export default function App() {
 
   return (
     <Layout>
-      <Routes>
-        {/* Secure Application Area (Dashboard) */}
-        <Route 
-          path="/" 
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/create-plan" 
-          element={
-            <PrivateRoute>
-              <CreatePlan />
-            </PrivateRoute>
-          } 
-        />
-        <Route 
-          path="/plan/:id" 
-          element={
-            <PrivateRoute>
-              <PlanDetails />
-            </PrivateRoute>
-          } 
-        />
+      <Suspense fallback={<GlobalLoader />}>
+        <Routes>
+          {/* Secure Application Area (Dashboard) */}
+          <Route 
+            path="/" 
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/create-plan" 
+            element={
+              <PrivateRoute>
+                <CreatePlan />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/plan/:id" 
+            element={
+              <PrivateRoute>
+                <PlanDetails />
+              </PrivateRoute>
+            } 
+          />
 
-        {/* Public Authentication Pages (If already logged in, they shouldn't realistically stay here. You can add public redirects manually later if desired.) */}
-        <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
-        <Route path="/signup" element={currentUser ? <Navigate to="/" replace /> : <Signup />} />
-      </Routes>
+          {/* Public Authentication Pages */}
+          <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
+          <Route path="/signup" element={currentUser ? <Navigate to="/" replace /> : <Signup />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }

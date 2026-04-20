@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
@@ -13,10 +13,10 @@ export default function CreatePlan() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  function handleAIApply({ title: aiTitle, description: aiDesc }) {
+  const handleAIApply = useCallback(({ title: aiTitle, description: aiDesc }) => {
      setTitle(aiTitle);
      setDescription(aiDesc);
-  }
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
