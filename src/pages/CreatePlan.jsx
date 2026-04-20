@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import AIHelperModal from '../components/AIHelperModal';
 
 export default function CreatePlan() {
   const [title, setTitle] = useState('');
@@ -11,6 +12,11 @@ export default function CreatePlan() {
   const [loading, setLoading] = useState(false);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+
+  function handleAIApply({ title: aiTitle, description: aiDesc }) {
+     setTitle(aiTitle);
+     setDescription(aiDesc);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -63,6 +69,10 @@ export default function CreatePlan() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+        
+        {/* Generative Intelligence UI Drop Block */}
+        <AIHelperModal onApply={handleAIApply} />
+
         {error && (
           <div className="bg-red-50 text-red-600 p-4 rounded-md text-sm mb-6 border border-red-100">
             {error}
