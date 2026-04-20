@@ -17,6 +17,9 @@ export default function PlanDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Tab State
+  const [activeTab, setActiveTab] = useState('availability');
+
   // Invitation State
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('editor');
@@ -216,18 +219,18 @@ export default function PlanDetails() {
         </div>
       </div>
 
-      {/* Anchor Navigation */}
+      {/* Tab Navigation */}
       <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-2 rounded-lg border border-slate-200">
-         <a href="#availability" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Availability</a>
-         <a href="#budget" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Budget</a>
-         <a href="#discussion" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Discussion</a>
-         <a href="#team" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Team & Itinerary</a>
+         <button onClick={() => setActiveTab('availability')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'availability' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Availability</button>
+         <button onClick={() => setActiveTab('budget')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'budget' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Budget</button>
+         <button onClick={() => setActiveTab('discussion')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'discussion' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Discussion</button>
+         <button onClick={() => setActiveTab('team')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'team' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Team & Itinerary</button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+      <div className="mt-8">
         
-        <div className="lg:col-span-2 space-y-6">
-           <div id="availability" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px] scroll-mt-24">
+        {activeTab === 'availability' && (
+           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px]">
               <AvailabilityGrid 
                   plan={plan} 
                   setPlan={setPlan} 
@@ -236,104 +239,114 @@ export default function PlanDetails() {
                   isFinalized={isFinalized}
               />
            </div>
+        )}
            
-           <div id="budget" className="scroll-mt-24">
+        {activeTab === 'budget' && (
+           <div className="max-w-3xl mx-auto">
              <BudgetSystem plan={plan} setPlan={setPlan} userRole={userRole} />
            </div>
+        )}
            
-           <div id="discussion" className="scroll-mt-24">
+        {activeTab === 'discussion' && (
+           <div className="max-w-3xl mx-auto">
              <PlanDiscussions 
                 planId={plan.id}
-              currentUser={currentUser}
-              participantsInfo={participantsInfo}
-              isFinalized={isFinalized}
-              userRole={userRole}
-           />
+                currentUser={currentUser}
+                participantsInfo={participantsInfo}
+                isFinalized={isFinalized}
+                userRole={userRole}
+             />
            </div>
-        </div>
+        )}
 
-        <div id="team" className="space-y-6 scroll-mt-24">
-           <MemberManager
-             plan={plan}
-             setPlan={setPlan}
-             currentUser={currentUser}
-             participantsInfo={participantsInfo}
-             userRole={userRole}
-           />
+        {activeTab === 'team' && (
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="space-y-6 lg:col-span-1">
+                 <MemberManager
+                   plan={plan}
+                   setPlan={setPlan}
+                   currentUser={currentUser}
+                   participantsInfo={participantsInfo}
+                   userRole={userRole}
+                 />
 
-           {/* Invite Form — Owner only, when not finalized */}
-           {showInvite && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                 <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
-                 
-                 {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
-                 {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
-                 
-                 <form onSubmit={handleInvite} className="flex flex-col gap-2.5">
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="user@example.com" 
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      disabled={inviteLoading}
-                    />
-                    <div className="flex gap-2">
-                      <select 
-                        className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value)}
-                        disabled={inviteLoading}
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                      <button 
-                        type="submit" 
-                        disabled={inviteLoading}
-                        className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {inviteLoading ? 'Wait...' : 'Invite'}
-                      </button>
+                 {/* Invite Form — Owner only, when not finalized */}
+                 {showInvite && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                       <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
+                       
+                       {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
+                       {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
+                       
+                       <form onSubmit={handleInvite} className="flex flex-col gap-2.5">
+                          <input 
+                            type="email" 
+                            required
+                            placeholder="user@example.com" 
+                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            disabled={inviteLoading}
+                          />
+                          <div className="flex gap-2">
+                            <select 
+                              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
+                              value={inviteRole}
+                              onChange={(e) => setInviteRole(e.target.value)}
+                              disabled={inviteLoading}
+                            >
+                              <option value="editor">Editor</option>
+                              <option value="viewer">Viewer</option>
+                            </select>
+                            <button 
+                              type="submit" 
+                              disabled={inviteLoading}
+                              className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {inviteLoading ? 'Wait...' : 'Invite'}
+                            </button>
+                          </div>
+                       </form>
                     </div>
-                 </form>
+                 )}
+
+                 {/* Actions: Delete (owner) or Leave (editor/viewer) */}
+                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <h4 className="text-sm font-bold text-slate-800 mb-3">Actions</h4>
+                    {isOwner ? (
+                      <button
+                        onClick={handleDeletePlan}
+                        className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete Plan
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleLeaveGroup}
+                        className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2.5 rounded-lg transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        Leave Group
+                      </button>
+                    )}
+                 </div>
               </div>
-           )}
-
-           {/* Final Itinerary — sidebar */}
-           <Itinerary
-              plan={plan}
-              setPlan={setPlan}
-              userRole={userRole}
-           />
-
-           {/* Actions: Delete (owner) or Leave (editor/viewer) */}
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h4 className="text-sm font-bold text-slate-800 mb-3">Actions</h4>
-              {isOwner ? (
-                <button
-                  onClick={handleDeletePlan}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
-                  Delete Plan
-                </button>
-              ) : (
-                <button
-                  onClick={handleLeaveGroup}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2.5 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                  </svg>
-                  Leave Group
-                </button>
-              )}
+              
+              <div className="lg:col-span-2">
+                 {/* Final Itinerary */}
+                 <Itinerary
+                    plan={plan}
+                    setPlan={setPlan}
+                    userRole={userRole}
+                 />
+              </div>
            </div>
-        </div>
+        )}
       </div>
     </div>
   );
