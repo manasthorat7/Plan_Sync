@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import AvailabilityGrid from '../components/AvailabilityGrid';
+import PlanDiscussions from '../components/PlanDiscussions';
 
 export default function PlanDetails() {
   const { id } = useParams();
@@ -195,6 +196,13 @@ export default function PlanDetails() {
                   participantsInfo={participantsInfo} 
               />
            </div>
+           
+           {/* Discussion Sync Layer explicitly hooked beneath evaluating isolated contexts dynamically */}
+           <PlanDiscussions 
+              planId={plan.id}
+              currentUser={currentUser}
+              participantsInfo={participantsInfo}
+           />
         </div>
 
         <div className="space-y-6">
