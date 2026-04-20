@@ -5,8 +5,12 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
+
+const googleProvider = new GoogleAuthProvider();
 
 const AuthContext = createContext();
 
@@ -30,21 +34,28 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
+  async function loginWithGoogle() {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
+  }
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Sync user payload natively to the normalize 'users' collection framework
-        try {
-          await setDoc(doc(db, 'users', user.uid), {
-            uid: user.uid,
-            email: user.email
-          }, { merge: true });
-        } catch (e) {
-          console.error("Failed to sync normalized user record: ", e);
-        }
-      }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setLoading(false);
+
+      if (user) {
+        // Sync user payload natively to the normalize 'users' collection framework
+        // Notice: This runs asynchronously in the background so it doesn't block the UI state hook
+        setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || null,
+          photoURL: user.photoURL || null
+        }, { merge: true }).catch(e => {
+          console.error("Failed to sync normalized user record: ", e);
+        });
+      }
     });
 
     // Cleanup subscription on unmount
@@ -55,7 +66,8 @@ export function AuthProvider({ children }) {
     currentUser,
     signup,
     login,
-    logout
+    logout,
+    loginWithGoogle
   };
 
   return (

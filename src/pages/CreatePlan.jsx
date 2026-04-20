@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../services/firebase';
+import { db, auth } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import AIHelperModal from '../components/AIHelperModal';
 
@@ -14,9 +14,30 @@ export default function CreatePlan() {
   const navigate = useNavigate();
 
   const handleAIApply = useCallback(({ title: aiTitle, description: aiDesc }) => {
-     setTitle(aiTitle);
-     setDescription(aiDesc);
+    setTitle(aiTitle);
+    setDescription(aiDesc);
   }, []);
+
+  // Debug function — test raw Firestore connectivity
+  async function testFirestore() {
+    console.log("🧪 Testing Firestore connection...");
+    console.log("🧪 db object:", db);
+    console.log("🧪 auth.currentUser:", auth.currentUser);
+    try {
+      const ref = await addDoc(collection(db, "test"), {
+        message: "Firestore connectivity test",
+        time: new Date(),
+        uid: auth.currentUser?.uid || "no-user",
+      });
+      console.log("✅ Test write SUCCESS — doc ID:", ref.id);
+      alert("✅ Firestore works! Doc ID: " + ref.id);
+    } catch (e) {
+      console.error("❌ Test write FAILED:", e);
+      console.error("❌ Error code:", e.code);
+      console.error("❌ Error message:", e.message);
+      alert("❌ Firestore test failed: " + e.code + " — " + e.message);
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -24,29 +45,43 @@ export default function CreatePlan() {
       return setError('Plan title is required.');
     }
 
+    if (!currentUser) {
+      return setError('You must be logged in to create a plan.');
+    }
+
+    console.log("📝 Starting plan creation...");
+    console.log("📝 currentUser.uid:", currentUser.uid);
+    console.log("📝 db instance:", db);
+
     try {
       setError('');
       setLoading(true);
 
-      // Construct document payload strictly adhering to prompt specification requirements
       const planData = {
         title: title.trim(),
         description: description.trim(),
-        participants: [currentUser.uid], // Include creator exclusively at init
+        participants: [currentUser.uid],
         roles: {
-          [currentUser.uid]: 'owner' // Assign the constructing user explicit ownership map mapping
+          [currentUser.uid]: 'owner'
         },
         status: 'draft',
-        createdAt: serverTimestamp(), // Dynamically register server-side instantiation
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'plans'), planData);
-      
-      // Dispatch securely back to Dashboard rendering timeline
+      console.log("📝 Plan payload:", JSON.stringify(planData, null, 2));
+      console.log("📝 Calling addDoc now...");
+
+      const docRef = await addDoc(collection(db, 'plans'), planData);
+
+      console.log("✅ Plan created successfully! ID:", docRef.id);
       navigate('/');
     } catch (err) {
-      console.error(err);
-      setError('Failed to create the plan: ' + err.message);
+      console.error("🔥 FIRESTORE WRITE ERROR:", err);
+      console.error("🔥 Error code:", err.code);
+      console.error("🔥 Error message:", err.message);
+      console.error("🔥 Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      setError('Failed to create plan: ' + (err.code ? `[${err.code}] ` : '') + err.message);
     } finally {
       setLoading(false);
     }
@@ -55,8 +90,8 @@ export default function CreatePlan() {
   return (
     <div className="max-w-3xl mx-auto p-6 mt-4">
       <div className="mb-6">
-        <button 
-          onClick={() => navigate(-1)} 
+        <button
+          onClick={() => navigate(-1)}
           className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center transition-colors mb-4"
         >
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +104,7 @@ export default function CreatePlan() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-        
+
         {/* Generative Intelligence UI Drop Block */}
         <AIHelperModal onApply={handleAIApply} />
 
@@ -78,6 +113,18 @@ export default function CreatePlan() {
             {error}
           </div>
         )}
+
+        {/* Debug button — remove after confirming Firestore works */}
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-xs text-amber-700 font-medium mb-2">🛠️ Debug: Test if Firestore can accept writes</p>
+          <button
+            type="button"
+            onClick={testFirestore}
+            className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            Test Firestore Write
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

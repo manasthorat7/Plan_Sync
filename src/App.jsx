@@ -20,12 +20,31 @@ function Layout({ children }) {
       <header className="bg-primary text-white p-4 shadow-sm border-b border-indigo-400 flex justify-between items-center">
         <h1 className="text-xl font-bold">PlanSync</h1>
         {currentUser && (
-          <button 
-            onClick={logout} 
-            className="text-sm bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg transition-colors shadow-sm ml-4"
-          >
-            Log Out
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {currentUser.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="avatar" 
+                  className="w-8 h-8 rounded-full border-2 border-indigo-300 object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-indigo-400 border-2 border-indigo-300 flex items-center justify-center text-sm font-bold uppercase">
+                  {(currentUser.displayName || currentUser.email || '?')[0]}
+                </div>
+              )}
+              <span className="text-sm font-medium hidden sm:inline truncate max-w-[160px]">
+                {currentUser.displayName || currentUser.email}
+              </span>
+            </div>
+            <button 
+              onClick={logout} 
+              className="text-sm bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-lg transition-colors shadow-sm"
+            >
+              Log Out
+            </button>
+          </div>
         )}
       </header>
       <main className="flex-1 w-full relative">
