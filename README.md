@@ -34,9 +34,9 @@ Three hierarchical roles:
 
 | Role           | Permissions                                    |
 | -------------- | ---------------------------------------------- |
-| **Head Owner** | Full control, finalize itinerary, manage roles |
-| **Owner**      | Edit itinerary, manage activities              |
-| **Editor**     | Suggest ideas, participate in discussions      |
+| **Owner** | Full control, finalize itinerary, manage roles |
+| **Editor**      | Edit itinerary, manage activities              |
+| **Viewer**     | Suggest ideas, participate in discussions      |
 
 * Dynamic role updates
 * Controlled access system
