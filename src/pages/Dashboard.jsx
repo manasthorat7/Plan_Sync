@@ -78,7 +78,7 @@ export default function Dashboard() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map(plan => (
-            <div key={plan.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col">
+            <Link to={`/plan/${plan.id}`} key={plan.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col">
               <div className="p-6 flex-1">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-bold text-slate-800 line-clamp-2 pr-2">{plan.title}</h3>
@@ -101,7 +101,7 @@ export default function Dashboard() {
                   {plan.participants?.length || 1} participant{plan.participants?.length !== 1 ? 's' : ''}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext'
 import PrivateRoute from './components/PrivateRoute'
 import Dashboard from './pages/Dashboard'
 import CreatePlan from './pages/CreatePlan'
+import PlanDetails from './pages/PlanDetails'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 
@@ -49,6 +50,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <CreatePlan />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/plan/:id" 
+          element={
+            <PrivateRoute>
+              <PlanDetails />
             </PrivateRoute>
           } 
         />
