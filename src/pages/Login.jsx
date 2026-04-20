@@ -47,15 +47,15 @@ export default function Login() {
 
   return (
     <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 min-h-[80vh]">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+      <div className="max-w-md w-full space-y-8 bg-white/10 dark:bg-white/5 backdrop-blur-xl p-8 rounded-2xl shadow-2xl border border-white/20 dark:border-white/10">
         <div>
-          <h2 className="mt-2 text-center text-3xl font-bold text-slate-800">
+          <h2 className="mt-2 text-center text-3xl font-bold text-white">
             Log in to PlanSync
           </h2>
         </div>
         
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 border border-red-100">
+          <div className="bg-red-500/20 text-red-200 p-3 rounded-xl text-sm mb-4 border border-red-500/30 font-medium">
             {error}
           </div>
         )}
@@ -65,10 +65,10 @@ export default function Login() {
           type="button"
           onClick={handleGoogleLogin}
           disabled={googleLoading || loading}
-          className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-slate-300 rounded-lg shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-colors"
+          className="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-white/20 dark:border-white/10 rounded-xl shadow-sm text-sm font-bold text-white bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 transition-all backdrop-blur"
         >
           {googleLoading ? (
-            <svg className="animate-spin h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-5 w-5 text-white/50" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -86,37 +86,37 @@ export default function Login() {
         {/* Divider */}
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200"></div>
+            <div className="w-full border-t border-white/20 dark:border-white/10"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-white text-slate-400 font-medium">or sign in with email</span>
+            <span className="px-3 bg-transparent text-purple-200 dark:text-slate-500 font-medium backdrop-blur-sm">or sign in with email</span>
           </div>
         </div>
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="email">
+              <label className="block text-sm font-medium text-purple-200 dark:text-slate-400 mb-1" htmlFor="email">
                 Email address
               </label>
               <input
                 id="email"
                 type="email"
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2.5 border border-white/20 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary transition-all bg-white/10 dark:bg-white/5 text-white placeholder-white/40 font-medium backdrop-blur"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="password">
+              <label className="block text-sm font-medium text-purple-200 dark:text-slate-400 mb-1" htmlFor="password">
                 Password
               </label>
               <input
                 id="password"
                 type="password"
                 required
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2.5 border border-white/20 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary transition-all bg-white/10 dark:bg-white/5 text-white placeholder-white/40 font-medium backdrop-blur"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -127,16 +127,16 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading || googleLoading}
-              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-gradient-to-r from-primary to-purple-600 hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 transition-all hover:scale-[1.02]"
             >
               {loading ? 'Logging in...' : 'Log In'}
             </button>
           </div>
         </form>
 
-        <div className="text-center mt-4 text-sm text-slate-600">
+        <div className="text-center mt-4 text-sm text-purple-200 dark:text-slate-400">
           Need an account?{' '}
-          <Link to="/signup" className="font-medium text-primary hover:text-indigo-600">
+          <Link to="/signup" className="font-bold text-white hover:text-purple-200 dark:hover:text-indigo-400 transition-colors">
             Sign up
           </Link>
         </div>

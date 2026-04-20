@@ -7,6 +7,7 @@ import PlanDiscussions from '../components/PlanDiscussions';
 import MemberManager from '../components/MemberManager';
 import Itinerary from '../components/Itinerary';
 import BudgetSystem from '../components/BudgetSystem';
+import GlassCard from '../components/GlassCard';
 
 function PlanDetailsInner() {
   const { 
@@ -95,7 +96,7 @@ function PlanDetailsInner() {
       <div className="mb-6">
         <button 
           onClick={() => navigate('/')} 
-          className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center transition-colors mb-4"
+          className="text-sm font-medium text-purple-200 dark:text-slate-400 hover:text-white flex items-center transition-colors mb-4"
         >
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
@@ -106,39 +107,39 @@ function PlanDetailsInner() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <div>
              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                 <h2 className="text-4xl font-extrabold text-slate-800">{plan.title}</h2>
-                 <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider whitespace-nowrap mt-1 ${
-                    isFinalized ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                    'bg-amber-100 text-amber-800'
+                 <h2 className="text-4xl font-extrabold text-white drop-shadow-sm">{plan.title}</h2>
+                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap mt-1 shadow-sm border ${
+                    isFinalized ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' :
+                    'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
                  }`}>
                     {isFinalized ? 'Locked' : 'Draft'}
                  </span>
                  {isFinalized && plan.finalSlot && (
-                    <span className="text-sm bg-primary text-white font-semibold px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-sm border border-indigo-500">
+                    <span className="text-sm bg-gradient-to-r from-primary to-purple-600 text-white font-semibold px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-md">
                        🎯 {plan.finalSlot}
                     </span>
                  )}
              </div>
-             {plan.description && <p className="text-slate-600 mt-2 text-lg">{plan.description}</p>}
+             {plan.description && <p className="text-purple-200 dark:text-slate-400 mt-2 text-lg font-medium">{plan.description}</p>}
            </div>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-2 rounded-lg border border-slate-200">
-         <button onClick={() => setActiveTab('availability')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'availability' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Availability</button>
-         <button onClick={() => setActiveTab('budget')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'budget' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Budget</button>
-         <button onClick={() => setActiveTab('discussion')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'discussion' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Discussion</button>
-         <button onClick={() => setActiveTab('team')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded shadow-sm border transition-colors ${activeTab === 'team' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200'}`}>Team & Itinerary</button>
-      </div>
+      <GlassCard className="flex flex-wrap gap-2 mb-6 p-2 !rounded-xl !border-0 bg-white/20 dark:bg-black/20">
+         <button onClick={() => setActiveTab('availability')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded-lg shadow-sm border transition-colors ${activeTab === 'availability' ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-500/30' : 'bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border-transparent'}`}>Availability</button>
+         <button onClick={() => setActiveTab('budget')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded-lg shadow-sm border transition-colors ${activeTab === 'budget' ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-500/30' : 'bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border-transparent'}`}>Budget</button>
+         <button onClick={() => setActiveTab('discussion')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded-lg shadow-sm border transition-colors ${activeTab === 'discussion' ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-500/30' : 'bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border-transparent'}`}>Discussion</button>
+         <button onClick={() => setActiveTab('team')} className={`flex-1 text-center py-2 px-3 text-sm font-semibold rounded-lg shadow-sm border transition-colors ${activeTab === 'team' ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-500/30' : 'bg-white/50 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-white/10 border-transparent'}`}>Team & Itinerary</button>
+      </GlassCard>
 
       <div className="mt-8">
         
         {activeTab === 'availability' && (
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px]">
+           <GlassCard className="p-6 min-h-[300px]">
               {/* Components will now extract what they need via usePlanContext() internally */}
               <AvailabilityGrid />
-           </div>
+           </GlassCard>
         )}
            
         {activeTab === 'budget' && (
@@ -160,25 +161,25 @@ function PlanDetailsInner() {
 
                  {/* Invite Form */}
                  {permissions.canInvite && (
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                       <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
+                    <GlassCard className="p-6">
+                       <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-3">Invite User</h4>
                        
-                       {inviteFeedback.type === 'error' && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteFeedback.msg}</p>}
-                       {inviteFeedback.type === 'success' && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteFeedback.msg}</p>}
+                       {inviteFeedback.type === 'error' && <p className="text-xs font-bold text-red-700 dark:text-red-300 mb-3 bg-red-500/20 p-2 rounded-lg border border-red-500/30">{inviteFeedback.msg}</p>}
+                       {inviteFeedback.type === 'success' && <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 mb-3 bg-emerald-500/20 p-2 rounded-lg border border-emerald-500/30">{inviteFeedback.msg}</p>}
                        
                        <form onSubmit={handleInviteSubmit} className="flex flex-col gap-2.5">
                           <input 
                             type="email" 
                             required
                             placeholder="user@example.com" 
-                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
+                            className="w-full px-3 py-2 text-sm border border-white/30 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white/50 dark:bg-black/20 text-slate-800 dark:text-slate-100 placeholder-slate-500 transition-colors"
                             value={inviteEmail}
                             onChange={(e) => setInviteEmail(e.target.value)}
                             disabled={inviteLoading}
                           />
                           <div className="flex gap-2">
                             <select 
-                              className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
+                              className="flex-1 px-3 py-2 text-sm border border-white/30 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-white/50 dark:bg-black/20 text-slate-800 dark:text-slate-100 font-medium transition-colors"
                               value={inviteRole}
                               onChange={(e) => setInviteRole(e.target.value)}
                               disabled={inviteLoading}
@@ -189,22 +190,22 @@ function PlanDetailsInner() {
                             <button 
                               type="submit" 
                               disabled={inviteLoading}
-                              className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+                              className="bg-gradient-to-r from-primary to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105 shadow-md disabled:opacity-50 whitespace-nowrap"
                             >
                               {inviteLoading ? 'Wait...' : 'Invite'}
                             </button>
                           </div>
                        </form>
-                    </div>
+                    </GlassCard>
                  )}
 
                  {/* Actions */}
-                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                    <h4 className="text-sm font-bold text-slate-800 mb-3">Actions</h4>
+                 <GlassCard className="p-6">
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-3">Actions</h4>
                     {permissions.isOwner ? ( // Since permissions hook encapsulates logic, useOwner equivalent
                       <button
                         onClick={handleDeletePlan}
-                        className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-lg transition-colors"
+                        className="w-full flex items-center justify-center gap-2 text-sm font-bold text-red-700 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-4 py-2.5 rounded-xl transition-all hover:scale-105"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -214,7 +215,7 @@ function PlanDetailsInner() {
                     ) : (
                       <button
                         onClick={handleLeaveGroup}
-                        className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2.5 rounded-lg transition-colors"
+                        className="w-full flex items-center justify-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-4 py-2.5 rounded-xl transition-all hover:scale-105"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
@@ -222,7 +223,7 @@ function PlanDetailsInner() {
                         Leave Group
                       </button>
                     )}
-                 </div>
+                 </GlassCard>
               </div>
               
               <div className="lg:col-span-2">
