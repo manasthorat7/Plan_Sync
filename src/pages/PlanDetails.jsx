@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import AvailabilityGrid from '../components/AvailabilityGrid';
 import PlanDiscussions from '../components/PlanDiscussions';
 import MemberManager from '../components/MemberManager';
+import Itinerary from '../components/Itinerary';
 import { canInvite } from '../utils/permissions';
 
 export default function PlanDetails() {
@@ -148,9 +149,37 @@ export default function PlanDetails() {
     );
   }
 
+  async function handleDeletePlan() {
+    if (!window.confirm('Are you sure you want to permanently delete this plan? This cannot be undone.')) return;
+    try {
+      await deleteDoc(doc(db, 'plans', id));
+      navigate('/');
+    } catch (err) {
+      console.error('Delete plan error:', err);
+    }
+  }
+
+  async function handleLeaveGroup() {
+    if (!window.confirm('Are you sure you want to leave this plan?')) return;
+    try {
+      const planRef = doc(db, 'plans', id);
+      const updatedRoles = { ...plan.roles };
+      delete updatedRoles[currentUser.uid];
+
+      await updateDoc(planRef, {
+        participants: arrayRemove(currentUser.uid),
+        roles: updatedRoles
+      });
+      navigate('/');
+    } catch (err) {
+      console.error('Leave group error:', err);
+    }
+  }
+
   const userRole = plan?.roles?.[currentUser.uid] || 'viewer';
   const isFinalized = plan?.status === 'finalized';
   const showInvite = canInvite(userRole, isFinalized);
+  const isOwner = userRole === 'owner';
 
   return (
     <div className="max-w-5xl mx-auto p-6 mt-4">
@@ -256,6 +285,39 @@ export default function PlanDetails() {
                  </form>
               </div>
            )}
+
+           {/* Final Itinerary — sidebar */}
+           <Itinerary
+              plan={plan}
+              setPlan={setPlan}
+              userRole={userRole}
+           />
+
+           {/* Actions: Delete (owner) or Leave (editor/viewer) */}
+           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h4 className="text-sm font-bold text-slate-800 mb-3">Actions</h4>
+              {isOwner ? (
+                <button
+                  onClick={handleDeletePlan}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                  Delete Plan
+                </button>
+              ) : (
+                <button
+                  onClick={handleLeaveGroup}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2.5 rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                  </svg>
+                  Leave Group
+                </button>
+              )}
+           </div>
         </div>
       </div>
     </div>

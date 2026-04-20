@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import SkeletonCard from '../components/SkeletonCard';
+import { getRoleBadge } from '../utils/permissions';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -84,15 +85,13 @@ export default function Dashboard() {
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-bold text-slate-800 line-clamp-2 pr-2">{plan.title}</h3>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider whitespace-nowrap ${
-                    plan.status === 'upcoming' ? 'bg-amber-100 text-amber-800' :
-                    plan.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
-                    'bg-slate-100 text-slate-800'
+                    plan.status === 'finalized' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                    'bg-amber-100 text-amber-800'
                   }`}>
-                    {plan.status || 'Draft'}
+                    {plan.status === 'finalized' ? '🔒 Locked' : plan.status || 'Draft'}
                   </span>
                 </div>
                 {plan.description && <p className="text-slate-600 text-sm mb-4 line-clamp-2">{plan.description}</p>}
-                
               </div>
               <div className="bg-slate-50 px-6 py-4 border-t border-slate-100 flex items-center justify-between">
                 <div className="flex items-center text-slate-500 text-sm font-medium">
@@ -101,6 +100,15 @@ export default function Dashboard() {
                   </svg>
                   {plan.participants?.length || 1} participant{plan.participants?.length !== 1 ? 's' : ''}
                 </div>
+                {(() => {
+                  const role = plan.roles?.[currentUser.uid] || 'viewer';
+                  const badge = getRoleBadge(role);
+                  return (
+                    <span className={`text-[10px] ${badge.bg} border ${badge.border} ${badge.text} px-2 py-0.5 rounded-md uppercase font-semibold tracking-wider`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
               </div>
             </Link>
           ))}
