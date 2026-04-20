@@ -7,6 +7,7 @@ import AvailabilityGrid from '../components/AvailabilityGrid';
 import PlanDiscussions from '../components/PlanDiscussions';
 import MemberManager from '../components/MemberManager';
 import Itinerary from '../components/Itinerary';
+import BudgetSystem from '../components/BudgetSystem';
 import { canInvite } from '../utils/permissions';
 
 export default function PlanDetails() {
@@ -215,10 +216,18 @@ export default function PlanDetails() {
         </div>
       </div>
 
+      {/* Anchor Navigation */}
+      <div className="flex flex-wrap gap-2 mb-6 bg-slate-50 p-2 rounded-lg border border-slate-200">
+         <a href="#availability" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Availability</a>
+         <a href="#budget" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Budget</a>
+         <a href="#discussion" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Discussion</a>
+         <a href="#team" className="flex-1 text-center py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 text-sm font-semibold rounded shadow-sm border border-slate-200 transition-colors">Team & Itinerary</a>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
         
         <div className="lg:col-span-2 space-y-6">
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px]">
+           <div id="availability" className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px] scroll-mt-24">
               <AvailabilityGrid 
                   plan={plan} 
                   setPlan={setPlan} 
@@ -228,16 +237,22 @@ export default function PlanDetails() {
               />
            </div>
            
-           <PlanDiscussions 
-              planId={plan.id}
+           <div id="budget" className="scroll-mt-24">
+             <BudgetSystem plan={plan} setPlan={setPlan} userRole={userRole} />
+           </div>
+           
+           <div id="discussion" className="scroll-mt-24">
+             <PlanDiscussions 
+                planId={plan.id}
               currentUser={currentUser}
               participantsInfo={participantsInfo}
               isFinalized={isFinalized}
               userRole={userRole}
            />
+           </div>
         </div>
 
-        <div className="space-y-6">
+        <div id="team" className="space-y-6 scroll-mt-24">
            <MemberManager
              plan={plan}
              setPlan={setPlan}

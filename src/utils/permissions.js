@@ -23,6 +23,10 @@ export function canInvite(role, isFinalized) {
   return role === 'owner' && !isFinalized;
 }
 
+export function canEditBudget(role) {
+  return role === 'owner';
+}
+
 export function canDiscuss(role, isFinalized) {
   return !isFinalized && ['owner', 'editor', 'viewer'].includes(role);
 }
