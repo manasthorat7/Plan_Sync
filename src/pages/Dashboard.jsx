@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -43,12 +44,12 @@ export default function Dashboard() {
           <h2 className="text-3xl font-bold text-slate-800">Your Plans</h2>
           <p className="text-slate-600 mt-1">Manage and collaborate on your group itineraries.</p>
         </div>
-        <button className="flex items-center gap-2 bg-primary hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg shadow-sm font-medium transition-colors whitespace-nowrap">
+        <Link to="/create-plan" className="flex items-center gap-2 bg-primary hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg shadow-sm font-medium transition-colors whitespace-nowrap">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path>
           </svg>
           Create Plan
-        </button>
+        </Link>
       </div>
 
       {error && (
@@ -70,9 +71,9 @@ export default function Dashboard() {
             </div>
             <h3 className="text-lg font-medium text-slate-900 mb-1">No plans yet</h3>
             <p className="text-slate-500 mb-6">You aren't a part of any active plans right now.</p>
-            <button className="bg-primary hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm">
+            <Link to="/create-plan" className="bg-primary hover:bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium transition-colors shadow-sm inline-block">
               Create your first plan
-            </button>
+            </Link>
          </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
