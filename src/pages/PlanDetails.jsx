@@ -5,6 +5,8 @@ import { db } from '../services/firebase';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayUnion } from 'firebase/firestore';
 import AvailabilityGrid from '../components/AvailabilityGrid';
 import PlanDiscussions from '../components/PlanDiscussions';
+import MemberManager from '../components/MemberManager';
+import { canInvite } from '../utils/permissions';
 
 export default function PlanDetails() {
   const { id } = useParams();
@@ -31,7 +33,6 @@ export default function PlanDetails() {
 
         if (docSnap.exists()) {
           const planData = docSnap.data();
-          // Security verify
           if (!planData.participants?.includes(currentUser.uid)) {
              setError("You do not have permission to view this plan.");
              setPlan(null);
@@ -42,7 +43,6 @@ export default function PlanDetails() {
           setPlan({ id: docSnap.id, ...planData });
           setError('');
 
-          // Fetch explicit participant emails across the mapped UIDs dynamically
           const infoMap = {};
           await Promise.all((planData.participants || []).map(async (uid) => {
              const userSnap = await getDoc(doc(db, 'users', uid));
@@ -60,7 +60,7 @@ export default function PlanDetails() {
         }
       } catch (err) {
         console.error("Fetch Details Error:", err);
-        setError("Error loading plan details structure from database.");
+        setError("Error loading plan details from database.");
       } finally {
         setLoading(false);
       }
@@ -79,53 +79,48 @@ export default function PlanDetails() {
 
     setInviteLoading(true);
     try {
-      // 1. Traverse normalized users directory locating the mapping
       const q = query(collection(db, 'users'), where('email', '==', inviteEmail.trim()));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setInviteError("User not found across registered accounts.");
+        setInviteError("User not found. They must sign up first.");
         setInviteLoading(false);
         return;
       }
 
-      // Secure specific match
       let newUserId = null;
-      let newUserEmail = null;
-      querySnapshot.forEach((doc) => {
-        newUserId = doc.data().uid;
-        newUserEmail = doc.data().email;
+      let newUserData = null;
+      querySnapshot.forEach((d) => {
+        newUserId = d.data().uid;
+        newUserData = d.data();
       });
 
-      // 2. Trap duplication
       if (plan.participants.includes(newUserId)) {
-         setInviteError("User lies inside active participant array already.");
+         setInviteError("User is already a participant.");
          setInviteLoading(false);
          return;
       }
 
-      // 3. Sync changes backwards into global scope securely
       const planRef = doc(db, 'plans', id);
       await updateDoc(planRef, {
         participants: arrayUnion(newUserId),
         [`roles.${newUserId}`]: inviteRole
       });
 
-      // 4. Clean frontend local mirroring perfectly smoothly
-      setParticipantsInfo(prev => ({ ...prev, [newUserId]: { uid: newUserId, email: newUserEmail } }));
+      setParticipantsInfo(prev => ({ ...prev, [newUserId]: newUserData }));
       
-      const newPlanState = { ...plan };
-      newPlanState.participants.push(newUserId);
-      if (!newPlanState.roles) newPlanState.roles = {};
-      newPlanState.roles[newUserId] = inviteRole;
-      setPlan(newPlanState);
+      setPlan(prev => ({
+        ...prev,
+        participants: [...prev.participants, newUserId],
+        roles: { ...prev.roles, [newUserId]: inviteRole }
+      }));
 
-      setInviteSuccess(`${inviteEmail} added successfully!`);
-      setInviteEmail('');  // Purge text
+      setInviteSuccess(`${inviteEmail} added as ${inviteRole}!`);
+      setInviteEmail('');
       
     } catch (err) {
-       console.error("Encountered inviting exception:", err);
-       setInviteError("Error transmitting invitation parameters to Firebase.");
+       console.error("Invite error:", err);
+       setInviteError("Failed to invite user.");
     } finally {
        setInviteLoading(false);
     }
@@ -153,8 +148,9 @@ export default function PlanDetails() {
     );
   }
 
-  const isOwner = plan?.roles?.[currentUser.uid] === 'owner' || false;
+  const userRole = plan?.roles?.[currentUser.uid] || 'viewer';
   const isFinalized = plan?.status === 'finalized';
+  const showInvite = canInvite(userRole, isFinalized);
 
   return (
     <div className="max-w-5xl mx-auto p-6 mt-4">
@@ -171,16 +167,16 @@ export default function PlanDetails() {
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
            <div>
-             <div className="flex items-center gap-3 mb-2">
+             <div className="flex items-center gap-3 mb-2 flex-wrap">
                  <h2 className="text-4xl font-extrabold text-slate-800">{plan.title}</h2>
                  <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider whitespace-nowrap mt-1 ${
-                    plan.status === 'finalized' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                    isFinalized ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                     'bg-amber-100 text-amber-800'
                  }`}>
-                    {plan.status === 'finalized' ? 'Locked' : 'Draft'}
+                    {isFinalized ? 'Locked' : 'Draft'}
                  </span>
-                 {plan.status === 'finalized' && plan.finalSlot && (
-                    <span className="text-sm bg-primary text-white font-semibold px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-sm border border-indigo-500 ml-2">
+                 {isFinalized && plan.finalSlot && (
+                    <span className="text-sm bg-primary text-white font-semibold px-4 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap shadow-sm border border-indigo-500">
                        🎯 {plan.finalSlot}
                     </span>
                  )}
@@ -197,93 +193,69 @@ export default function PlanDetails() {
               <AvailabilityGrid 
                   plan={plan} 
                   setPlan={setPlan} 
-                  isOwner={isOwner} 
+                  userRole={userRole}
                   participantsInfo={participantsInfo} 
                   isFinalized={isFinalized}
               />
            </div>
            
-           {/* Discussion Sync Layer explicitly hooked beneath evaluating isolated contexts dynamically */}
            <PlanDiscussions 
               planId={plan.id}
               currentUser={currentUser}
               participantsInfo={participantsInfo}
               isFinalized={isFinalized}
+              userRole={userRole}
            />
         </div>
 
         <div className="space-y-6">
-           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
-                Participants
-                <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">{plan.participants?.length || 0}</span>
-              </h3>
-              
-              <ul className="space-y-3">
-                 {plan.participants?.map(uid => {
-                    const info = participantsInfo[uid];
-                    const email = info?.email || uid;
-                    const role = plan.roles?.[uid] || 'participant';
+           <MemberManager
+             plan={plan}
+             setPlan={setPlan}
+             currentUser={currentUser}
+             participantsInfo={participantsInfo}
+             userRole={userRole}
+           />
 
-                    return (
-                        <li key={uid} className="flex items-center justify-between gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                           <div className="flex items-center gap-3 overflow-hidden">
-                             <div className="h-8 w-8 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs shrink-0 uppercase border border-indigo-200">
-                                {email.substring(0, 2)}
-                             </div>
-                             <div className="text-sm font-medium text-slate-700 truncate min-w-0">
-                                {email}
-                                {uid === currentUser.uid && <span className="text-xs text-slate-400 font-normal ml-1">(You)</span>}
-                             </div>
-                           </div>
-                           <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-md uppercase font-semibold tracking-wider shrink-0">
-                             {role}
-                           </span>
-                        </li>
-                    )
-                 })}
-              </ul>
-              
-              {/* Conditional Inviting Tool restricted exclusively to owners */}
-              {isOwner && !isFinalized && (
-                 <div className="mt-6 pt-5 border-t border-slate-100">
-                    <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
-                    
-                    {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
-                    {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
-                    
-                    <form onSubmit={handleInvite} className="flex flex-col gap-2.5 relative">
-                       <input 
-                         type="email" 
-                         required
-                         placeholder="user@example.com" 
-                         className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
-                         value={inviteEmail}
-                         onChange={(e) => setInviteEmail(e.target.value)}
-                         disabled={inviteLoading}
-                       />
-                       <div className="flex gap-2">
-                         <select 
-                           className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
-                           value={inviteRole}
-                           onChange={(e) => setInviteRole(e.target.value)}
-                           disabled={inviteLoading}
-                         >
-                           <option value="editor">Editor</option>
-                           <option value="owner">Owner</option>
-                         </select>
-                         <button 
-                           type="submit" 
-                           disabled={inviteLoading}
-                           className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
-                         >
-                           {inviteLoading ? 'Wait...' : 'Invite'}
-                         </button>
-                       </div>
-                    </form>
-                 </div>
-              )}
-           </div>
+           {/* Invite Form — Owner only, when not finalized */}
+           {showInvite && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                 <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
+                 
+                 {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
+                 {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
+                 
+                 <form onSubmit={handleInvite} className="flex flex-col gap-2.5">
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="user@example.com" 
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary placeholder-slate-400 bg-white"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      disabled={inviteLoading}
+                    />
+                    <div className="flex gap-2">
+                      <select 
+                        className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-white font-medium text-slate-700"
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        disabled={inviteLoading}
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                      <button 
+                        type="submit" 
+                        disabled={inviteLoading}
+                        className="bg-primary hover:bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {inviteLoading ? 'Wait...' : 'Invite'}
+                      </button>
+                    </div>
+                 </form>
+              </div>
+           )}
         </div>
       </div>
     </div>

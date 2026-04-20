@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { canDiscuss } from '../utils/permissions';
 
-export default function PlanDiscussions({ planId, currentUser, participantsInfo, isFinalized }) {
+export default function PlanDiscussions({ planId, currentUser, participantsInfo, isFinalized, userRole }) {
+  const allowDiscuss = canDiscuss(userRole, isFinalized);
   const [comments, setComments] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -120,7 +122,7 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
                     <p className="whitespace-pre-wrap leading-relaxed">{comment.text}</p>
                     
                     {/* Hover Operational Modals cleanly separated from main structure preventing layout disruptions */}
-                    {isAuthor && !isFinalized && (
+                    {isAuthor && allowDiscuss && (
                       <div className={`absolute top-0 flex gap-0.5 bg-white backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-4 ${isAuthor ? '-left-14' : '-right-14'}`}>
                         <button 
                           onClick={() => { setEditingId(comment.id); setEditMessage(comment.text); }}
@@ -153,14 +155,14 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
           <input
             type="text"
             className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white focus:ring-2 focus:ring-indigo-100 rounded-full text-sm outline-none transition-all placeholder-slate-400 font-medium text-slate-700 disabled:opacity-50 disabled:bg-slate-100"
-            placeholder={isFinalized ? "Plan is finalized. Discussion locked." : "Write a message..."}
+            placeholder={!allowDiscuss ? "Discussion is locked." : "Write a message..."}
             value={newMessage}
-            disabled={isFinalized}
+            disabled={!allowDiscuss}
             onChange={(e) => setNewMessage(e.target.value)}
           />
           <button 
             type="submit" 
-            disabled={!newMessage.trim() || isFinalized}
+            disabled={!newMessage.trim() || !allowDiscuss}
             className="p-2.5 bg-primary hover:bg-indigo-600 text-white rounded-full transition-all shadow-sm disabled:opacity-50 disabled:hover:bg-primary disabled:cursor-not-allowed hover:shadow hover:-translate-y-0.5"
           >
             <svg className="w-5 h-5 pl-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

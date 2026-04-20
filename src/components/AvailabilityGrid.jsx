@@ -3,8 +3,9 @@ import { db } from '../services/firebase';
 import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { calculateBestSlot } from '../utils/calculateBestSlot';
+import { canEditSlots, canFinalize, canVote } from '../utils/permissions';
 
-export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsInfo, isFinalized }) {
+export default function AvailabilityGrid({ plan, userRole, setPlan, participantsInfo, isFinalized }) {
   const { currentUser } = useAuth();
   
   const [userSelections, setUserSelections] = useState(
@@ -23,6 +24,10 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
     return calculateBestSlot(timeSlots, availabilities);
   }, [timeSlots, availabilities]);
 
+  const allowVote = canVote(userRole, isFinalized);
+  const allowEditSlots = canEditSlots(userRole, isFinalized);
+  const allowFinalize = canFinalize(userRole);
+
   function calculateSlotStats(slotName) {
     let available = 0;
     let maybe = 0;
@@ -39,11 +44,11 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
 
   async function handleAddSlot(e) {
     e.preventDefault();
-    if (!newSlotLabel.trim() || isFinalized) return;
+    if (!newSlotLabel.trim() || !allowEditSlots) return;
     
     const slot = newSlotLabel.trim();
     if (timeSlots.includes(slot)) {
-      setError("This exact time slot has already been generated!");
+      setError("This time slot already exists!");
       return;
     }
 
@@ -63,14 +68,14 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
       setNewSlotLabel("");
     } catch (err) {
       console.error(err);
-      setError("Failed to push time slot onto server infrastructure.");
+      setError("Failed to add time slot.");
     } finally {
       setIsAddingSlot(false);
     }
   }
 
   async function saveAvailabilities() {
-    if (isFinalized) return;
+    if (!allowVote) return;
     setIsSaving(true);
     setError("");
     
@@ -89,14 +94,14 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
       }));
     } catch(err) {
        console.error(err);
-       setError("System malfunction locking in availability choice strings.");
+       setError("Failed to save your votes.");
     } finally {
        setIsSaving(false);
     }
   }
 
   function toggleStatus(slotName, status) {
-     if (isFinalized) return;
+     if (!allowVote) return;
      setUserSelections(prev => ({
         ...prev,
         [slotName]: prev[slotName] === status ? null : status
@@ -104,7 +109,7 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
   }
 
   async function handleFinalize(slot) {
-     if (!window.confirm(`Are you absolutely sure you want to lock the plan exclusively to: ${slot}? This permanently disables voting.`)) return;
+     if (!allowFinalize) return;
      try {
         setError("");
         const planRef = doc(db, 'plans', plan.id);
@@ -115,7 +120,7 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
         setPlan(prev => ({ ...prev, status: 'finalized', finalSlot: slot }));
      } catch (e) {
         console.error(e);
-        setError("Failed to finalize plan timeline array.");
+        setError("Failed to finalize plan.");
      }
   }
 
@@ -123,7 +128,7 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
     <div className="flex flex-col h-full w-full">
       <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
          <h3 className="text-xl font-bold text-slate-800">Time Slot Availability</h3>
-         {!isFinalized && (
+         {allowVote && (
             <button 
                onClick={saveAvailabilities}
                disabled={isSaving || timeSlots.length === 0}
@@ -141,7 +146,8 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
             <svg className="w-10 h-10 mx-auto mb-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
             </svg>
-            <p className="font-medium text-slate-600">No collaborative time slots have been proposed yet.</p>
+            <p className="font-medium text-slate-600">No time slots proposed yet.</p>
+            {allowEditSlots && <p className="text-xs text-slate-400 mt-1">Add one below to get started.</p>}
          </div>
       ) : (
          <div className="overflow-x-auto mb-6">
@@ -150,8 +156,8 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                <tr className="bg-slate-50 text-slate-600 text-xs font-bold uppercase tracking-wider border-y border-slate-200">
                  <th className="py-3 px-4 w-1/3">Proposed Slot</th>
                  <th className="py-3 px-4 w-1/3">Your Availability</th>
-                 <th className="py-3 px-4 text-center w-1/3">Group Trend Status</th>
-                 {isOwner && !isFinalized && <th className="py-3 px-4 text-center w-32">Action</th>}
+                 <th className="py-3 px-4 text-center w-1/3">Group Trend</th>
+                 {allowFinalize && !isFinalized && <th className="py-3 px-4 text-center w-32">Action</th>}
                </tr>
              </thead>
              <tbody>
@@ -171,7 +177,7 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                            {slot}
                            {isPickedFinal ? (
                               <span className="bg-emerald-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold shadow-sm whitespace-nowrap shrink-0">
-                                LOCkED
+                                Locked
                               </span>
                            ) : optimalTimeSlot === slot && !isFinalized && (
                               <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold shadow-sm whitespace-nowrap shrink-0">
@@ -184,22 +190,22 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                        <div className="flex gap-2 text-xs font-semibold">
                          <button 
                            onClick={() => toggleStatus(slot, 'available')}
-                           disabled={isFinalized}
-                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'available' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'} disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:cursor-not-allowed`}
+                           disabled={!allowVote}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'available' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            Available
                          </button>
                          <button 
                            onClick={() => toggleStatus(slot, 'maybe')}
-                           disabled={isFinalized}
-                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'maybe' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200 hover:text-amber-600'} disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:cursor-not-allowed`}
+                           disabled={!allowVote}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'maybe' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200 hover:text-amber-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            Maybe
                          </button>
                          <button 
                            onClick={() => toggleStatus(slot, 'unavailable')}
-                           disabled={isFinalized}
-                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'unavailable' ? 'bg-red-100 border-red-200 text-red-800' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600'} disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:text-slate-500 disabled:cursor-not-allowed`}
+                           disabled={!allowVote}
+                           className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'unavailable' ? 'bg-red-100 border-red-200 text-red-800' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            No
                          </button>
@@ -210,16 +216,16 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                             <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-wider">Awaiting Votes</span>
                         ) : (
                             <div className="flex items-center justify-center gap-2 text-sm font-bold bg-slate-50 py-1.5 rounded-lg border border-slate-100">
-                               <span className="text-emerald-600" title={`${stats.available} Available`}>{stats.available} Yay</span> <span className="text-slate-300">|</span>
-                               <span className="text-amber-500" title={`${stats.maybe} Maybe`}>{stats.maybe} TBD</span> <span className="text-slate-300">|</span>
-                               <span className="text-red-500" title={`${stats.unavailable} Unavailable`}>{stats.unavailable} Nay</span>
+                               <span className="text-emerald-600">{stats.available} Yay</span> <span className="text-slate-300">|</span>
+                               <span className="text-amber-500">{stats.maybe} TBD</span> <span className="text-slate-300">|</span>
+                               <span className="text-red-500">{stats.unavailable} Nay</span>
                             </div>
                         )}
                      </td>
-                     {isOwner && !isFinalized && (
+                     {allowFinalize && !isFinalized && (
                          <td className="py-4 px-4 text-center">
                              <button onClick={() => handleFinalize(slot)} className="text-xs font-bold uppercase tracking-wider text-primary bg-indigo-50 border border-indigo-100 hover:bg-primary hover:text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                                Lock Target
+                                Lock
                              </button>
                          </td>
                      )}
@@ -231,10 +237,10 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
          </div>
       )}
 
-      {/* Owner Dynamic Control Parameter Generation Layer */}
-      {isOwner && !isFinalized && (
+      {/* Add Slot — Owner only */}
+      {allowEditSlots && (
          <div className="mt-auto pt-4 border-t border-slate-100">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Owner Controls — Generate Grid Nodes</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Add Time Slot</h4>
             <form onSubmit={handleAddSlot} className="flex gap-2 items-center">
                <input 
                  type="text" 
@@ -250,7 +256,7 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                  disabled={isAddingSlot}
                  className="bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
                >
-                 {isAddingSlot ? 'Processing...' : 'Add Time Slot'}
+                 {isAddingSlot ? 'Adding...' : 'Add Slot'}
                </button>
             </form>
          </div>
