@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { db } from '../services/firebase';
 import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { calculateBestSlot } from '../utils/calculateBestSlot';
 
 export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsInfo }) {
   const { currentUser } = useAuth();
@@ -18,6 +19,11 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
 
   const timeSlots = plan.timeSlots || [];
   const availabilities = plan.availabilities || {};
+
+  // Optimize calculation overhead strictly parsing optimal slot scores on array changes exclusively
+  const optimalTimeSlot = useMemo(() => {
+    return calculateBestSlot(timeSlots, availabilities);
+  }, [timeSlots, availabilities]);
 
   // Logic processing evaluating exact participant voting arrays locally
   function calculateSlotStats(slotName) {
@@ -142,8 +148,17 @@ export default function AvailabilityGrid({ plan, isOwner, setPlan, participantsI
                  const myVote = userSelections[slot];
 
                  return (
-                   <tr key={slot} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                     <td className="py-4 px-4 font-semibold text-slate-800">{slot}</td>
+                   <tr key={slot} className={`border-b border-slate-100 transition-colors ${optimalTimeSlot === slot ? 'bg-indigo-50/70 hover:bg-indigo-100/70 border-l-4 border-l-primary' : 'hover:bg-slate-50/50'}`}>
+                     <td className="py-4 px-4 font-semibold text-slate-800">
+                        <div className="flex items-center gap-2">
+                           {slot}
+                           {optimalTimeSlot === slot && (
+                              <span className="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold shadow-sm whitespace-nowrap shrink-0">
+                                Top Pick
+                              </span>
+                           )}
+                        </div>
+                     </td>
                      <td className="py-4 px-4">
                        <div className="flex gap-2 text-xs font-semibold">
                          <button 
