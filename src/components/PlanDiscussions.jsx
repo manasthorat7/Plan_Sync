@@ -1,47 +1,43 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../services/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { canDiscuss } from '../utils/permissions';
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { usePlanContext } from '../context/PlanContext';
+import useFirestoreSync from '../hooks/useFirestoreSync';
 
-export default function PlanDiscussions({ planId, currentUser, participantsInfo, isFinalized, userRole }) {
-  const allowDiscuss = canDiscuss(userRole, isFinalized);
-  const [comments, setComments] = useState([]);
+export default function PlanDiscussions() {
+  const { plan, currentUserUid, participantsInfo, permissions } = usePlanContext();
+  
   const [newMessage, setNewMessage] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editMessage, setEditMessage] = useState("");
   const messagesEndRef = useRef(null);
 
-  // Real-time synchronization layer maintaining premium feeling application scope via onSnapshot
-  useEffect(() => {
-    const q = query(
-      collection(db, 'plans', planId, 'comments'),
-      orderBy('createdAt', 'asc')
-    );
+  // Hooking up the custom Firestore Real-Time sync
+  const queryRef = useMemo(() => {
+     if (!plan?.id) return null;
+     return query(
+        collection(db, 'plans', plan.id, 'comments'),
+        orderBy('createdAt', 'asc')
+     );
+  }, [plan?.id]);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedComments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setComments(fetchedComments);
-    });
-
-    return () => unsubscribe();
-  }, [planId]);
+  const { data: comments, loading } = useFirestoreSync(queryRef);
 
   // Autoscroll mechanics
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [comments]);
+    if (!loading) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [comments, loading]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !plan?.id) return;
 
     try {
-      await addDoc(collection(db, 'plans', planId, 'comments'), {
+      await addDoc(collection(db, 'plans', plan.id, 'comments'), {
         text: newMessage.trim(),
-        authorId: currentUser.uid,
+        authorId: currentUserUid,
         createdAt: serverTimestamp()
       });
       setNewMessage("");
@@ -51,10 +47,10 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
   }
 
   async function handleUpdate(commentId) {
-    if (!editMessage.trim()) return;
+    if (!editMessage.trim() || !plan?.id) return;
 
     try {
-      await updateDoc(doc(db, 'plans', planId, 'comments', commentId), {
+      await updateDoc(doc(db, 'plans', plan.id, 'comments', commentId), {
         text: editMessage.trim(),
         updatedAt: serverTimestamp()
       });
@@ -69,7 +65,7 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
     if (!window.confirm("Are you sure you want to permanently delete this message?")) return;
     
     try {
-      await deleteDoc(doc(db, 'plans', planId, 'comments', commentId));
+      await deleteDoc(doc(db, 'plans', plan.id, 'comments', commentId));
     } catch (err) {
       console.error("Error executing comment destruction command:", err);
     }
@@ -83,7 +79,11 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-        {comments.length === 0 ? (
+        {loading ? (
+           <div className="h-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+           </div>
+        ) : comments.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-400">
              <svg className="w-10 h-10 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
              <p className="text-sm font-medium">No messages yet.</p>
@@ -91,7 +91,7 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
           </div>
         ) : (
           comments.map(comment => {
-            const isAuthor = comment.authorId === currentUser.uid;
+            const isAuthor = comment.authorId === currentUserUid;
             const authorEmail = participantsInfo[comment.authorId]?.email || "Unknown User";
 
             return (
@@ -121,8 +121,7 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
                   <div className={`group relative w-fit max-w-[85%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isAuthor ? 'bg-primary text-white rounded-br-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'}`}>
                     <p className="whitespace-pre-wrap leading-relaxed">{comment.text}</p>
                     
-                    {/* Hover Operational Modals cleanly separated from main structure preventing layout disruptions */}
-                    {isAuthor && allowDiscuss && (
+                    {isAuthor && permissions.canDiscuss && (
                       <div className={`absolute top-0 flex gap-0.5 bg-white backdrop-blur-sm p-1 rounded-lg border border-slate-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity -mt-4 ${isAuthor ? '-left-14' : '-right-14'}`}>
                         <button 
                           onClick={() => { setEditingId(comment.id); setEditMessage(comment.text); }}
@@ -149,20 +148,19 @@ export default function PlanDiscussions({ planId, currentUser, participantsInfo,
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Aesthetic messaging prompt mapped tightly into the flex-col constraints ensuring padding looks premium */}
       <div className="p-3 bg-white border-t border-slate-100 rounded-b-xl">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <input
             type="text"
             className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-primary focus:bg-white focus:ring-2 focus:ring-indigo-100 rounded-full text-sm outline-none transition-all placeholder-slate-400 font-medium text-slate-700 disabled:opacity-50 disabled:bg-slate-100"
-            placeholder={!allowDiscuss ? "Discussion is locked." : "Write a message..."}
+            placeholder={!permissions.canDiscuss ? "Discussion is locked." : "Write a message..."}
             value={newMessage}
-            disabled={!allowDiscuss}
+            disabled={!permissions.canDiscuss}
             onChange={(e) => setNewMessage(e.target.value)}
           />
           <button 
             type="submit" 
-            disabled={!newMessage.trim() || !allowDiscuss}
+            disabled={!newMessage.trim() || !permissions.canDiscuss}
             className="p-2.5 bg-primary hover:bg-indigo-600 text-white rounded-full transition-all shadow-sm disabled:opacity-50 disabled:hover:bg-primary disabled:cursor-not-allowed hover:shadow hover:-translate-y-0.5"
           >
             <svg className="w-5 h-5 pl-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

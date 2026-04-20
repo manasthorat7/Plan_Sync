@@ -1,21 +1,15 @@
 import React from 'react';
-import { db } from '../services/firebase';
-import { doc, updateDoc, arrayRemove } from 'firebase/firestore';
-import { getRoleBadge, canManageMembers } from '../utils/permissions';
+import { usePlanContext } from '../context/PlanContext';
+import { arrayRemove } from 'firebase/firestore';
 
-export default function MemberManager({ plan, setPlan, currentUser, participantsInfo, userRole }) {
-  const isManager = canManageMembers(userRole);
+export default function MemberManager() {
+  const { plan, updatePlan, participantsInfo, currentUserUid, permissions } = usePlanContext();
 
   async function handleRoleChange(uid, newRole) {
     try {
-      const planRef = doc(db, 'plans', plan.id);
-      await updateDoc(planRef, {
+      await updatePlan({
         [`roles.${uid}`]: newRole
       });
-      setPlan(prev => ({
-        ...prev,
-        roles: { ...prev.roles, [uid]: newRole }
-      }));
     } catch (err) {
       console.error("Failed to update role:", err);
     }
@@ -23,25 +17,12 @@ export default function MemberManager({ plan, setPlan, currentUser, participants
 
   async function handleRemoveMember(uid) {
     try {
-      const planRef = doc(db, 'plans', plan.id);
-      
-      // Build updated roles without this user
       const updatedRoles = { ...plan.roles };
       delete updatedRoles[uid];
 
-      await updateDoc(planRef, {
+      await updatePlan({
         participants: arrayRemove(uid),
         roles: updatedRoles
-      });
-
-      setPlan(prev => {
-        const newRoles = { ...prev.roles };
-        delete newRoles[uid];
-        return {
-          ...prev,
-          participants: prev.participants.filter(p => p !== uid),
-          roles: newRoles
-        };
       });
     } catch (err) {
       console.error("Failed to remove member:", err);
@@ -53,18 +34,29 @@ export default function MemberManager({ plan, setPlan, currentUser, participants
       <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-3 flex items-center justify-between">
         Team
         <span className="bg-primary text-white text-xs px-2 py-0.5 rounded-full">
-          {plan.participants?.length || 0}
+          {plan?.participants?.length || 0}
         </span>
       </h3>
 
       <ul className="space-y-2">
-        {plan.participants?.map(uid => {
+        {plan?.participants?.map(uid => {
           const info = participantsInfo[uid];
           const email = info?.displayName || info?.email || uid;
-          const role = plan.roles?.[uid] || 'viewer';
-          const badge = getRoleBadge(role);
-          const isSelf = uid === currentUser.uid;
-          const isOwnerUser = role === 'owner';
+          const roleString = plan.roles?.[uid] || 'viewer';
+          
+          // Helper to fetch badges locally since we have context inside components
+          const getBadge = (r) => {
+             switch (r) {
+                case 'owner': return { label: 'Owner', bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-200' };
+                case 'editor': return { label: 'Editor', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200' };
+                case 'viewer': return { label: 'Viewer', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+                default: return { label: 'Member', bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+             }
+          };
+          const badge = getBadge(roleString);
+          
+          const isSelf = uid === currentUserUid;
+          const isOwnerUser = roleString === 'owner';
 
           return (
             <li key={uid} className="flex items-center justify-between gap-2 p-2.5 hover:bg-slate-50 rounded-lg transition-colors">
@@ -90,10 +82,10 @@ export default function MemberManager({ plan, setPlan, currentUser, participants
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {isManager && !isOwnerUser && !isSelf ? (
+                {permissions.canManageMembers && !isOwnerUser && !isSelf ? (
                   <>
                     <select
-                      value={role}
+                      value={roleString}
                       onChange={(e) => handleRoleChange(uid, e.target.value)}
                       className="text-xs font-semibold border border-slate-200 rounded-md px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                     >

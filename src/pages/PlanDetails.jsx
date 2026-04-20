@@ -1,22 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../services/firebase';
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { PlanProvider, usePlanContext } from '../context/PlanContext';
 import AvailabilityGrid from '../components/AvailabilityGrid';
 import PlanDiscussions from '../components/PlanDiscussions';
 import MemberManager from '../components/MemberManager';
 import Itinerary from '../components/Itinerary';
 import BudgetSystem from '../components/BudgetSystem';
-import { canInvite } from '../utils/permissions';
 
-export default function PlanDetails() {
-  const { id } = useParams();
-  const [plan, setPlan] = useState(null);
-  const [participantsInfo, setParticipantsInfo] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+function PlanDetailsInner() {
+  const { 
+    plan, 
+    loading, 
+    error, 
+    deletePlanDb, 
+    leavePlan, 
+    inviteUser, 
+    permissions,
+    isFinalized
+  } = usePlanContext();
   
+  const navigate = useNavigate();
+
   // Tab State
   const [activeTab, setActiveTab] = useState('availability');
 
@@ -24,112 +29,7 @@ export default function PlanDetails() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('editor');
   const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteError, setInviteError] = useState('');
-  const [inviteSuccess, setInviteSuccess] = useState('');
-
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    async function fetchPlanAndUsers() {
-      try {
-        const docRef = doc(db, 'plans', id);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const planData = docSnap.data();
-          if (!planData.participants?.includes(currentUser.uid)) {
-             setError("You do not have permission to view this plan.");
-             setPlan(null);
-             setLoading(false);
-             return;
-          } 
-          
-          setPlan({ id: docSnap.id, ...planData });
-          setError('');
-
-          const infoMap = {};
-          await Promise.all((planData.participants || []).map(async (uid) => {
-             const userSnap = await getDoc(doc(db, 'users', uid));
-             if (userSnap.exists()) {
-                infoMap[uid] = userSnap.data();
-             } else {
-                infoMap[uid] = { email: "Unknown User", uid };
-             }
-          }));
-
-          setParticipantsInfo(infoMap);
-
-        } else {
-          setError("Plan not found. It may have been deleted.");
-        }
-      } catch (err) {
-        console.error("Fetch Details Error:", err);
-        setError("Error loading plan details from database.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (id && currentUser) {
-      fetchPlanAndUsers();
-    }
-  }, [id, currentUser]);
-
-  async function handleInvite(e) {
-    e.preventDefault();
-    setInviteError('');
-    setInviteSuccess('');
-    if (!inviteEmail.trim()) return;
-
-    setInviteLoading(true);
-    try {
-      const q = query(collection(db, 'users'), where('email', '==', inviteEmail.trim()));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        setInviteError("User not found. They must sign up first.");
-        setInviteLoading(false);
-        return;
-      }
-
-      let newUserId = null;
-      let newUserData = null;
-      querySnapshot.forEach((d) => {
-        newUserId = d.data().uid;
-        newUserData = d.data();
-      });
-
-      if (plan.participants.includes(newUserId)) {
-         setInviteError("User is already a participant.");
-         setInviteLoading(false);
-         return;
-      }
-
-      const planRef = doc(db, 'plans', id);
-      await updateDoc(planRef, {
-        participants: arrayUnion(newUserId),
-        [`roles.${newUserId}`]: inviteRole
-      });
-
-      setParticipantsInfo(prev => ({ ...prev, [newUserId]: newUserData }));
-      
-      setPlan(prev => ({
-        ...prev,
-        participants: [...prev.participants, newUserId],
-        roles: { ...prev.roles, [newUserId]: inviteRole }
-      }));
-
-      setInviteSuccess(`${inviteEmail} added as ${inviteRole}!`);
-      setInviteEmail('');
-      
-    } catch (err) {
-       console.error("Invite error:", err);
-       setInviteError("Failed to invite user.");
-    } finally {
-       setInviteLoading(false);
-    }
-  }
+  const [inviteFeedback, setInviteFeedback] = useState({ type: '', msg: '' });
 
   if (loading) {
     return (
@@ -139,12 +39,12 @@ export default function PlanDetails() {
     );
   }
 
-  if (error) {
+  if (error || !plan) {
     return (
       <div className="max-w-5xl mx-auto p-6 mt-4">
         <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 mb-6 flex flex-col items-start gap-4">
           <h3 className="text-lg font-bold">Unauthorized / Not Found</h3>
-          <p>{error}</p>
+          <p>{error || "Plan could not be loaded."}</p>
           <button onClick={() => navigate('/')} className="px-4 py-2 bg-red-100 text-red-800 rounded font-medium hover:bg-red-200 transition-colors shadow-sm">
             Return to Dashboard
           </button>
@@ -156,7 +56,7 @@ export default function PlanDetails() {
   async function handleDeletePlan() {
     if (!window.confirm('Are you sure you want to permanently delete this plan? This cannot be undone.')) return;
     try {
-      await deleteDoc(doc(db, 'plans', id));
+      await deletePlanDb();
       navigate('/');
     } catch (err) {
       console.error('Delete plan error:', err);
@@ -166,24 +66,29 @@ export default function PlanDetails() {
   async function handleLeaveGroup() {
     if (!window.confirm('Are you sure you want to leave this plan?')) return;
     try {
-      const planRef = doc(db, 'plans', id);
-      const updatedRoles = { ...plan.roles };
-      delete updatedRoles[currentUser.uid];
-
-      await updateDoc(planRef, {
-        participants: arrayRemove(currentUser.uid),
-        roles: updatedRoles
-      });
+      await leavePlan();
       navigate('/');
     } catch (err) {
       console.error('Leave group error:', err);
     }
   }
 
-  const userRole = plan?.roles?.[currentUser.uid] || 'viewer';
-  const isFinalized = plan?.status === 'finalized';
-  const showInvite = canInvite(userRole, isFinalized);
-  const isOwner = userRole === 'owner';
+  async function handleInviteSubmit(e) {
+    e.preventDefault();
+    setInviteFeedback({ type: '', msg: '' });
+    if (!inviteEmail.trim()) return;
+
+    setInviteLoading(true);
+    const res = await inviteUser(inviteEmail.trim(), inviteRole);
+    setInviteLoading(false);
+
+    if (res.error) {
+       setInviteFeedback({ type: 'error', msg: res.error });
+    } else if (res.success) {
+       setInviteFeedback({ type: 'success', msg: res.message });
+       setInviteEmail('');
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto p-6 mt-4">
@@ -231,54 +136,37 @@ export default function PlanDetails() {
         
         {activeTab === 'availability' && (
            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 min-h-[300px]">
-              <AvailabilityGrid 
-                  plan={plan} 
-                  setPlan={setPlan} 
-                  userRole={userRole}
-                  participantsInfo={participantsInfo} 
-                  isFinalized={isFinalized}
-              />
+              {/* Components will now extract what they need via usePlanContext() internally */}
+              <AvailabilityGrid />
            </div>
         )}
            
         {activeTab === 'budget' && (
            <div className="max-w-3xl mx-auto">
-             <BudgetSystem plan={plan} setPlan={setPlan} userRole={userRole} />
+             <BudgetSystem />
            </div>
         )}
            
         {activeTab === 'discussion' && (
            <div className="max-w-3xl mx-auto">
-             <PlanDiscussions 
-                planId={plan.id}
-                currentUser={currentUser}
-                participantsInfo={participantsInfo}
-                isFinalized={isFinalized}
-                userRole={userRole}
-             />
+             <PlanDiscussions planId={plan.id} />
            </div>
         )}
 
         {activeTab === 'team' && (
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="space-y-6 lg:col-span-1">
-                 <MemberManager
-                   plan={plan}
-                   setPlan={setPlan}
-                   currentUser={currentUser}
-                   participantsInfo={participantsInfo}
-                   userRole={userRole}
-                 />
+                 <MemberManager />
 
-                 {/* Invite Form — Owner only, when not finalized */}
-                 {showInvite && (
+                 {/* Invite Form */}
+                 {permissions.canInvite && (
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                        <h4 className="text-sm font-bold text-slate-800 mb-3">Invite User</h4>
                        
-                       {inviteError && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteError}</p>}
-                       {inviteSuccess && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteSuccess}</p>}
+                       {inviteFeedback.type === 'error' && <p className="text-xs font-medium text-red-600 mb-3 bg-red-50 p-2 rounded">{inviteFeedback.msg}</p>}
+                       {inviteFeedback.type === 'success' && <p className="text-xs font-medium text-emerald-700 mb-3 bg-emerald-50 p-2 rounded">{inviteFeedback.msg}</p>}
                        
-                       <form onSubmit={handleInvite} className="flex flex-col gap-2.5">
+                       <form onSubmit={handleInviteSubmit} className="flex flex-col gap-2.5">
                           <input 
                             type="email" 
                             required
@@ -310,10 +198,10 @@ export default function PlanDetails() {
                     </div>
                  )}
 
-                 {/* Actions: Delete (owner) or Leave (editor/viewer) */}
+                 {/* Actions */}
                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                     <h4 className="text-sm font-bold text-slate-800 mb-3">Actions</h4>
-                    {isOwner ? (
+                    {permissions.isOwner ? ( // Since permissions hook encapsulates logic, useOwner equivalent
                       <button
                         onClick={handleDeletePlan}
                         className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2.5 rounded-lg transition-colors"
@@ -338,16 +226,23 @@ export default function PlanDetails() {
               </div>
               
               <div className="lg:col-span-2">
-                 {/* Final Itinerary */}
-                 <Itinerary
-                    plan={plan}
-                    setPlan={setPlan}
-                    userRole={userRole}
-                 />
+                 <Itinerary />
               </div>
            </div>
         )}
       </div>
     </div>
   );
+}
+
+export default function PlanDetails() {
+   const { id } = useParams();
+   const { currentUser } = useAuth();
+
+   // Boundary wrap inside provider so children can safely use usePlanContext
+   return (
+      <PlanProvider planId={id} currentUserUid={currentUser?.uid}>
+         <PlanDetailsInner />
+      </PlanProvider>
+   );
 }

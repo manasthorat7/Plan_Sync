@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { db } from '../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { canEditBudget } from '../utils/permissions';
+import { usePlanContext } from '../context/PlanContext';
+import useBudget from '../hooks/useBudget';
 
 const CATEGORIES = [
   'Travel',
@@ -12,21 +11,18 @@ const CATEGORIES = [
   'Miscellaneous'
 ];
 
-export default function BudgetSystem({ plan, setPlan, userRole }) {
-  const allowEdit = canEditBudget(userRole);
+export default function BudgetSystem() {
+  const { plan, updatePlan, permissions } = usePlanContext();
+  
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [amount, setAmount] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialize budget array safely
-  const expenses = plan.budget || [];
+  const expenses = plan?.budget || [];
+  const participants = plan?.participants || [];
   
-  // Calculate aggregate metrics
-  const totalCost = expenses.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  
-  // Guard against divide by zero (Edge case: no participants, though it should never be 0 realistically)
-  const memberCount = plan.participants?.length || 1;
-  const perPersonCost = (totalCost / memberCount);
+  // Custom hook for math abstraction
+  const { totalCost, perPersonCost, memberCount } = useBudget(expenses, participants);
 
   // Formatting currency safely
   const formatCurrency = (val) => {
@@ -39,24 +35,18 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
 
   async function handleAddExpense(e) {
     e.preventDefault();
-    if (!allowEdit || !amount || Number(amount) < 0) return;
+    if (!permissions.canEditBudget || !amount || Number(amount) < 0) return;
 
     setIsSaving(true);
     try {
       const newExpense = {
-        id: Date.now().toString(), // Simple unique ID
+        id: Date.now().toString(),
         category,
         amount: Number(amount)
       };
 
-      const planRef = doc(db, 'plans', plan.id);
       const updatedBudget = [...expenses, newExpense];
-      
-      await updateDoc(planRef, { budget: updatedBudget });
-      
-      setPlan(prev => ({ ...prev, budget: updatedBudget }));
-      
-      // Clean up form
+      await updatePlan({ budget: updatedBudget });
       setAmount('');
     } catch (err) {
       console.error("Failed to add expense:", err);
@@ -66,15 +56,10 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
   }
 
   async function handleDeleteExpense(expenseId) {
-    if (!allowEdit) return;
-    
+    if (!permissions.canEditBudget) return;
     try {
       const updatedBudget = expenses.filter(e => e.id !== expenseId);
-      const planRef = doc(db, 'plans', plan.id);
-      
-      await updateDoc(planRef, { budget: updatedBudget });
-      
-      setPlan(prev => ({ ...prev, budget: updatedBudget }));
+      await updatePlan({ budget: updatedBudget });
     } catch (err) {
       console.error("Failed to delete expense:", err);
     }
@@ -92,7 +77,6 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Core Cost Display Cards */}
         <div className="grid grid-cols-2 gap-3">
            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Trip Cost</span>
@@ -104,7 +88,6 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
            </div>
         </div>
 
-        {/* Expenses List */}
         <div>
            <h4 className="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider border-b border-slate-100 pb-2">Expense Breakdown</h4>
            {expenses.length === 0 ? (
@@ -119,7 +102,7 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
                     <span className="text-sm font-semibold text-slate-700">{exp.category}</span>
                     <div className="flex items-center gap-3">
                        <span className="text-sm font-bold text-slate-800">{formatCurrency(exp.amount)}</span>
-                       {allowEdit && (
+                       {permissions.canEditBudget && (
                          <button 
                            onClick={() => handleDeleteExpense(exp.id)}
                            className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 rounded-md p-1 opacity-100 lg:opacity-0 group-hover:opacity-100"
@@ -136,8 +119,7 @@ export default function BudgetSystem({ plan, setPlan, userRole }) {
         </div>
       </div>
 
-      {/* Add Expense Form - Owner Only */}
-      {allowEdit && (
+      {permissions.canEditBudget && (
         <div className="p-4 bg-slate-50 border-t border-slate-200 rounded-b-xl">
            <form onSubmit={handleAddExpense} className="flex gap-2">
               <select 

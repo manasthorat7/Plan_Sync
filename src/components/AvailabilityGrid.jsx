@@ -1,32 +1,27 @@
 import React, { useState, useMemo } from 'react';
-import { db } from '../services/firebase';
-import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
-import { useAuth } from '../context/AuthContext';
+import { arrayUnion } from 'firebase/firestore';
+import { usePlanContext } from '../context/PlanContext';
 import { calculateBestSlot } from '../utils/calculateBestSlot';
-import { canEditSlots, canFinalize, canVote } from '../utils/permissions';
+import useToggle from '../hooks/useToggle';
 
-export default function AvailabilityGrid({ plan, userRole, setPlan, participantsInfo, isFinalized }) {
-  const { currentUser } = useAuth();
+export default function AvailabilityGrid() {
+  const { plan, updatePlan, currentUserUid, permissions, isFinalized } = usePlanContext();
   
   const [userSelections, setUserSelections] = useState(
-    plan.availabilities?.[currentUser.uid] || {}
+    plan?.availabilities?.[currentUserUid] || {}
   );
   
   const [newSlotLabel, setNewSlotLabel] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isAddingSlot, setIsAddingSlot] = useState(false);
+  const [isSaving, toggleSaving] = useToggle(false);
+  const [isAddingSlot, toggleAddingSlot] = useToggle(false);
   const [error, setError] = useState("");
 
-  const timeSlots = plan.timeSlots || [];
-  const availabilities = plan.availabilities || {};
+  const timeSlots = plan?.timeSlots || [];
+  const availabilities = plan?.availabilities || {};
 
   const optimalTimeSlot = useMemo(() => {
     return calculateBestSlot(timeSlots, availabilities);
   }, [timeSlots, availabilities]);
-
-  const allowVote = canVote(userRole, isFinalized);
-  const allowEditSlots = canEditSlots(userRole, isFinalized);
-  const allowFinalize = canFinalize(userRole);
 
   function calculateSlotStats(slotName) {
     let available = 0;
@@ -44,7 +39,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
 
   async function handleAddSlot(e) {
     e.preventDefault();
-    if (!newSlotLabel.trim() || !allowEditSlots) return;
+    if (!newSlotLabel.trim() || !permissions.canEditSlots) return;
     
     const slot = newSlotLabel.trim();
     if (timeSlots.includes(slot)) {
@@ -52,56 +47,41 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
       return;
     }
 
-    setIsAddingSlot(true);
+    toggleAddingSlot();
     setError("");
 
     try {
-      const planRef = doc(db, 'plans', plan.id);
-      await updateDoc(planRef, {
+      await updatePlan({
         timeSlots: arrayUnion(slot)
       });
-      
-      setPlan(prev => ({
-        ...prev,
-        timeSlots: [...(prev.timeSlots || []), slot]
-      }));
       setNewSlotLabel("");
     } catch (err) {
       console.error(err);
       setError("Failed to add time slot.");
     } finally {
-      setIsAddingSlot(false);
+      toggleAddingSlot();
     }
   }
 
   async function saveAvailabilities() {
-    if (!allowVote) return;
-    setIsSaving(true);
+    if (!permissions.canVote) return;
+    toggleSaving();
     setError("");
     
     try {
-      const planRef = doc(db, 'plans', plan.id);
-      await updateDoc(planRef, {
-        [`availabilities.${currentUser.uid}`]: userSelections
+      await updatePlan({
+        [`availabilities.${currentUserUid}`]: userSelections
       });
-
-      setPlan(prev => ({
-        ...prev,
-        availabilities: {
-          ...(prev.availabilities || {}),
-          [currentUser.uid]: userSelections
-        }
-      }));
     } catch(err) {
        console.error(err);
        setError("Failed to save your votes.");
     } finally {
-       setIsSaving(false);
+       toggleSaving();
     }
   }
 
   function toggleStatus(slotName, status) {
-     if (!allowVote) return;
+     if (!permissions.canVote) return;
      setUserSelections(prev => ({
         ...prev,
         [slotName]: prev[slotName] === status ? null : status
@@ -109,15 +89,13 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
   }
 
   async function handleFinalize(slot) {
-     if (!allowFinalize) return;
+     if (!permissions.canFinalize) return;
      try {
         setError("");
-        const planRef = doc(db, 'plans', plan.id);
-        await updateDoc(planRef, {
+        await updatePlan({
            status: 'finalized',
            finalSlot: slot
         });
-        setPlan(prev => ({ ...prev, status: 'finalized', finalSlot: slot }));
      } catch (e) {
         console.error(e);
         setError("Failed to finalize plan.");
@@ -128,7 +106,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
     <div className="flex flex-col h-full w-full">
       <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
          <h3 className="text-xl font-bold text-slate-800">Time Slot Availability</h3>
-         {allowVote && (
+         {permissions.canVote && (
             <button 
                onClick={saveAvailabilities}
                disabled={isSaving || timeSlots.length === 0}
@@ -147,7 +125,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
             </svg>
             <p className="font-medium text-slate-600">No time slots proposed yet.</p>
-            {allowEditSlots && <p className="text-xs text-slate-400 mt-1">Add one below to get started.</p>}
+            {permissions.canEditSlots && <p className="text-xs text-slate-400 mt-1">Add one below to get started.</p>}
          </div>
       ) : (
          <div className="overflow-x-auto mb-6">
@@ -157,7 +135,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
                  <th className="py-3 px-4 w-1/3">Proposed Slot</th>
                  <th className="py-3 px-4 w-1/3">Your Availability</th>
                  <th className="py-3 px-4 text-center w-1/3">Group Trend</th>
-                 {allowFinalize && !isFinalized && <th className="py-3 px-4 text-center w-32">Action</th>}
+                 {permissions.canFinalize && !isFinalized && <th className="py-3 px-4 text-center w-32">Action</th>}
                </tr>
              </thead>
              <tbody>
@@ -190,21 +168,21 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
                        <div className="flex gap-2 text-xs font-semibold">
                          <button 
                            onClick={() => toggleStatus(slot, 'available')}
-                           disabled={!allowVote}
+                           disabled={!permissions.canVote}
                            className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'available' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            Available
                          </button>
                          <button 
                            onClick={() => toggleStatus(slot, 'maybe')}
-                           disabled={!allowVote}
+                           disabled={!permissions.canVote}
                            className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'maybe' ? 'bg-amber-100 border-amber-200 text-amber-800' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-200 hover:text-amber-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            Maybe
                          </button>
                          <button 
                            onClick={() => toggleStatus(slot, 'unavailable')}
-                           disabled={!allowVote}
+                           disabled={!permissions.canVote}
                            className={`px-3 py-1.5 rounded-full border transition-colors ${myVote === 'unavailable' ? 'bg-red-100 border-red-200 text-red-800' : 'bg-white border-slate-200 text-slate-500 hover:border-red-200 hover:text-red-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                          >
                            No
@@ -222,7 +200,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
                             </div>
                         )}
                      </td>
-                     {allowFinalize && !isFinalized && (
+                     {permissions.canFinalize && !isFinalized && (
                          <td className="py-4 px-4 text-center">
                              <button onClick={() => handleFinalize(slot)} className="text-xs font-bold uppercase tracking-wider text-primary bg-indigo-50 border border-indigo-100 hover:bg-primary hover:text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
                                 Lock
@@ -238,7 +216,7 @@ export default function AvailabilityGrid({ plan, userRole, setPlan, participants
       )}
 
       {/* Add Slot — Owner only */}
-      {allowEditSlots && (
+      {permissions.canEditSlots && (
          <div className="mt-auto pt-4 border-t border-slate-100">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Add Time Slot</h4>
             <form onSubmit={handleAddSlot} className="flex gap-2 items-center">
